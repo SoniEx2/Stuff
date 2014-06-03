@@ -35,16 +35,43 @@ end
 -- Multiply
 
 function mul1(a,b)
-  for i=1,b do
-    a = add1(a,a)
+  if b > 0 then
+    for i=1,b do
+      a = add1(a,a)
+    end
+  else
+    for i=1,-b do
+      a = add1(a,a)
+    end
+    return -a
   end
   return a
 end
 
-function mul2(a,b) -- POSITIVE INT ONLY
-  for i=1,b do
-    a = add2(a,a)
+function mul2(a,b) -- POSITIVE a ONLY
+  if b > 0 then
+    for i=1,b do
+      a = add2(a,a)
+    end
+  else
+    for i=1,-b do
+      a = add2(a,a)
+    end
+    return -a
   end
   return a
 end
 
+function mul3(a,b)
+  if b > 0 then
+    for i=1,b do
+      a = add3(a,a)
+    end
+  else
+    for i=1,-b do
+      a = add3(a,a)
+    end
+    return -a
+  end
+  return a
+end
