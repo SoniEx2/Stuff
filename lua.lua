@@ -32,6 +32,20 @@ function add3(a,b)
   end
 end
 
+function add4(a,b)
+  local x,y,z = a, math.huge, b
+  if b < 0 then
+    y = -y -- aka -math.huge
+  end
+  local c
+  for i=x, y, z do
+    if c then
+      return i
+    end
+    c = true
+  end
+end
+
 -- Multiply
 
 function mul1(a,b)
