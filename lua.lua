@@ -32,4 +32,19 @@ function add3(a,b)
   end
 end
 
--- TODO more
+-- Multiply
+
+function mul1(a,b)
+  for i=1,b do
+    a = add1(a,a)
+  end
+  return a
+end
+
+function mul2(a,b) -- POSITIVE INT ONLY
+  for i=1,b do
+    a = add2(a,a)
+  end
+  return a
+end
+
