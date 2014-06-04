@@ -23,6 +23,8 @@ do -- recursivecopy(originalTable, recursionTable, copyKeys)
   local function _recursivecopy(ot, nt, r, ck, k)
     nt = nt or {}
     r = r or {}
+    -- debug line
+    --print(ot,nt,r,ck,k)
     if r[ot] == nil then
       r[ot] = nt
     end
@@ -40,6 +42,6 @@ do -- recursivecopy(originalTable, recursionTable, copyKeys)
     return _recursivecopy(ot, nt, r, ck, nk)
   end
   function recursivecopy(t, r, ck)
-    return _recursivecopy(ot, {}, r, ck)
+    return _recursivecopy(t, {}, r, ck)
   end
 end
