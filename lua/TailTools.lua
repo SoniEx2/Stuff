@@ -1,3 +1,5 @@
+local M = {}
+
 do -- range(from, to, increment)
   local function _recursiverange(i,b,c,...)
     if c > 0 and i > b then
@@ -13,7 +15,7 @@ do -- range(from, to, increment)
     return _recursiverange(i+c,b,c,i,...)
   end
   
-  function recursiverange(a,b,c)
+  function M.recursiverange(a,b,c)
     -- because range(1,3,1) is 1, 2, 3, not 3, 2, 1.
     return _recursiverange(b,a,-(c or 1))
   end
@@ -42,7 +44,7 @@ do -- recursivedeepcopy(originalTable, recursionTable, copyKeys)
     rawset(nt, nk, v)
     return _recursivedeepcopy(ot, nt, r, ck, k)
   end
-  function recursivedeepcopy(t, r, ck)
+  function M.recursivedeepcopy(t, r, ck)
     return _recursivedeepcopy(t, {}, r, ck)
   end
 end
@@ -59,7 +61,7 @@ do -- recursiveshallowcopy(originalTable)
     rawset(nt, nk, v)
     return _recursiveshallowcopy(ot, nt, nk)
   end
-  function recursiveshallowcopy(t)
+  function M.recursiveshallowcopy(t)
     return _recursiveshallowcopy(t, {})
   end
 end
