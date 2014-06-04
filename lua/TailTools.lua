@@ -33,13 +33,14 @@ do -- recursivedeepcopy(originalTable, recursionTable, copyKeys)
       return nt
     end
     if ck and type(nk) == "table" then
+      k = nk
       nk = r[nk] or _recursivedeepcopy(nk, {}, r, ck)
     end
     if type(v) == "table" then
       v = r[v] or _recursivedeepcopy(v, {}, r, ck)
     end
     rawset(nt, nk, v)
-    return _recursivedeepcopy(ot, nt, r, ck, nk)
+    return _recursivedeepcopy(ot, nt, r, ck, k)
   end
   function recursivedeepcopy(t, r, ck)
     return _recursivedeepcopy(t, {}, r, ck)
