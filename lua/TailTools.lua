@@ -18,3 +18,23 @@ do -- range(from, to, increment)
     return _recursiverange(b,a,-(c or 1))
   end
 end
+
+do -- recursivecopy(originalTable, recursionTable, copyKeys)
+  local function _recursivecopy(ot, nt, r, ck, k)
+    local nk, v = next(ot, k)
+    if nk == nil then
+      return nt
+    end
+    if ck and type(nk) == "table" then
+      nk = _recursivecopy(nk, {}, r, ck)
+    end
+    if type(v) == "table" then
+      v = _recursivecopy(v, {}, r, ck)
+    end
+    rawset(nt, nk, v)
+    return _recursivecopy(ot, nt, r, ck, nk)
+  end
+  function recursivecopy(t, r, ck)
+    return _recursivecopy(ot, {}, r, ck)
+  end
+end
