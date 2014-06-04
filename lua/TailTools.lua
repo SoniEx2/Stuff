@@ -21,15 +21,20 @@ end
 
 do -- recursivecopy(originalTable, recursionTable, copyKeys)
   local function _recursivecopy(ot, nt, r, ck, k)
+    nt = nt or {}
+    r = r or {}
+    if r[ot] == nil then
+      r[ot] = nt
+    end
     local nk, v = next(ot, k)
     if nk == nil then
       return nt
     end
     if ck and type(nk) == "table" then
-      nk = _recursivecopy(nk, {}, r, ck)
+      nk = r[nk] or _recursivecopy(nk, {}, r, ck)
     end
     if type(v) == "table" then
-      v = _recursivecopy(v, {}, r, ck)
+      v = r[v] or _recursivecopy(v, {}, r, ck)
     end
     rawset(nt, nk, v)
     return _recursivecopy(ot, nt, r, ck, nk)
