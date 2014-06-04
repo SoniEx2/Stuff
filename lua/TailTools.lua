@@ -65,3 +65,5 @@ do -- recursiveshallowcopy(originalTable)
     return _recursiveshallowcopy(t, {})
   end
 end
+
+return M
