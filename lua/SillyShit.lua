@@ -46,6 +46,8 @@ function add4(a,b)
     end
     c = true
   end
+  -- b=0 handling
+  return a
 end
 
 -- Multiply
