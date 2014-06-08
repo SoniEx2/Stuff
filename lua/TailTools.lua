@@ -66,4 +66,30 @@ do -- recursiveshallowcopy(originalTable)
   end
 end
 
+do -- recursiveprinttable(table)
+  local function escape(str)
+    local type_of_str = type(str)
+    if type_of_str == "table" or type_of_str == "function" or type_of_str == "userdata" then
+      return tostring(str)
+    end
+    str = ("%q"):format(str)
+    -- backslash-newline to backslash-n
+    str = str:gsub("\\\n","\\n")
+    return str
+  end
+  local function _recursiveprinttable(t, k, s)
+    -- debug line
+    --print(t,k)
+    local nk, v = next(t, k)
+    if nk == nil then
+      return s:sub(1,-3)
+    end
+    s = (s or "") .. string.format("[%s]=(%s), ",escape(nk),escape(v))
+    return _recursiveprinttable(t, nk, s)
+  end
+  function M.recursiveprinttable(t)
+    return "{" .. _recursiveprinttable(t) .. "}"
+  end
+end
+
 return M
