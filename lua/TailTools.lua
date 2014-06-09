@@ -92,4 +92,75 @@ do -- recursiveprinttable(table)
   end
 end
 
+do -- recursiveprettyprint(object)
+  local function stuffa(r, c, v)
+    local x = r[v]
+    if not x then
+      local tv = type(v)
+      if tv == "table" then
+        c["table"] = (c["table"] or 0) + 1
+        r[v] = "T" .. c["table"]
+      elseif tv == "userdata" then
+        c["ud"] = (c["ud"] or 0) + 1
+        r[v] = "U" .. c["ud"]
+      elseif tv == "function" then
+        c["function"] = (c["function"] or 0) + 1
+        r[v] = "F" .. c["function"]
+      elseif tv == "thread" then
+        c["thread"] = (c["thread"] or 0) + 1
+        r[v] = "C" .. c["thread"]
+      elseif tv == "string" then
+        if v:match("^[A-Za-z_][A-Za-z0-9_]*$") then
+          return v
+        end
+      end
+      x = r[v] or "[" .. string.format("%q", v):gsub("\\\n","\\n") .. "]"
+    end
+    return x
+  end
+  local function stuffb(r, c, v)
+    local x = r[v]
+    if not x then
+      local tv = type(v)
+      if tv == "table" then
+        c["table"] = (c["table"] or 0) + 1
+        r[v] = "T" .. c["table"]
+      elseif tv == "userdata" then
+        c["ud"] = (c["ud"] or 0) + 1
+        r[v] = "U" .. c["ud"]
+      elseif tv == "function" then
+        c["function"] = (c["function"] or 0) + 1
+        r[v] = "F" .. c["function"]
+      elseif tv == "thread" then
+        c["thread"] = (c["thread"] or 0) + 1
+        r[v] = "C" .. c["thread"]
+      end
+      x = r[v] or string.format("%q", v):gsub("\\\n","\\n")
+    end
+    return x
+  end
+  local function _recursiveprinttable(t, r, c, k, s)
+    -- debug line
+    --print(t,k)
+    r = r or {}
+    c = c or {}
+    local nk, v = next(t, k)
+    if nk == nil then
+      return s:sub(1,-3)
+    end
+    s = (s or "") .. string.format("%s = %s, ", stuffa(r, c, nk), stuffb(r, c, v))
+    return _recursiveprinttable(t, r, c, nk, s)
+  end
+  function M.recursiveprettyprint(t)
+    if type(t) == "table" then
+      local r,c = {},{}
+      r[t] = "T1"
+      c["table"] = 1
+      return "T1{" .. _recursiveprinttable(t, r, c) .. "}"
+    else
+      return stuffb(t, {}, {})
+    end
+  end
+end
+
 return M
