@@ -163,4 +163,56 @@ do -- recursiveprettyprint(object)
   end
 end
 
+do -- recursiveprettyprint2(object)
+  local stuffa,_recursiveprettyprint,stufftype
+  stufftype = function(v, r, c)
+    local x = r[v]
+    if not x then
+      local tv = type(v)
+      if tv == "table" then
+        c["table"] = (c["table"] or 0) + 1
+        x = "T" .. c["table"]
+        r[v] = x
+        return x .. _recursiveprinttable(v, r, c)
+      elseif tv == "function" then
+        c["function"] = (c["function"] or 0) + 1
+        x = "F" .. c["function"]
+      elseif tv == "userdata" then
+        c["ud"] = (c["ud"] or 0) + 1
+        x = "U" .. c["ud"]
+      elseif tv == "thread" then
+        c["thread"] = (c["thread"] or 0) + 1
+        x = "C" .. c["thread"]
+      end
+      r[v] = x
+    end
+    return x or string.format("%q", v):gsub("\\\n","\\n")
+  end
+  stuffa = function(v, r, c)
+    local tv = type(v)
+    if tv == "string" then
+      if v:match("^[A-Za-z_][A-Za-z0-9_]*$") then
+        return v
+      end
+    end
+    return "[" .. stufftype(v, r, c) .. "]"
+  end
+  function _recursiveprinttable(t, r, c, k, s)
+    -- debug line
+    --print(t,k)
+    r = r or {}
+    c = c or {}
+    s = s or ""
+    local nk, v = next(t, k)
+    if nk == nil then
+      return "{ " .. s:sub(1,-3) .. " }"
+    end
+    s = s .. string.format("%s = %s, ", stuffa(nk, r, c), stufftype(v, r, c))
+    return _recursiveprinttable(t, r, c, nk, s)
+  end
+  function M.recursiveprettyprint2(t)
+    return stufftype(t, {}, {})
+  end
+end
+
 return M
