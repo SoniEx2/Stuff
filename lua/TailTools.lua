@@ -114,7 +114,7 @@ do -- recursiveprettyprint(object)
           return v
         end
       end
-      x = r[v] or "[" .. string.format("%q", v):gsub("\\\n","\\n") .. "]"
+      x = "[" .. (r[v] or string.format("%q", v):gsub("\\\n","\\n")) .. "]"
     end
     return x
   end
