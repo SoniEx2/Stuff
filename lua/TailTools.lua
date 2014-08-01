@@ -16,7 +16,7 @@ do -- range(from, to, increment)
   end
   
   function M.recursiverange(a,b,c)
-    -- because range(1,3,1) is 1, 2, 3, not 3, 2, 1.
+    -- thanks to Lua's lack of a reverse(...) function, we have to run this backwards
     return _recursiverange(b,a,-(c or 1))
   end
 end
