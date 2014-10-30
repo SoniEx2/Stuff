@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "1.1.0"
+__module_version__ = "1.2.0"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
@@ -47,6 +47,31 @@ def setcolscmd(word, word_eol, userdata):
     return hexchat.EAT_ALL
 
 hexchat.hook_command("enableqccolors", setcolscmd, help="/enableqccolors true|false")
+
+# Enable badge tweaking by default
+_badge = True
+
+if hexchat.get_pluginpref("queercraft_badge"):
+    # Load color settings
+    _badge = hexchat.get_pluginpref("queercraft_badge") == "True"
+
+def setbadge(badge):
+    global _badge
+    _badge = badge
+    hexchat.set_pluginpref("queercraft_badge", str(badge))
+
+def setbadgecmd(word, word_eol, userdata):
+    if len(word) >= 2:
+        if word[1][0].lower() == "t":
+            setbadge(True)
+        if word[1][0].lower() == "f":
+            setbadge(False)
+    return hexchat.EAT_ALL
+
+hexchat.hook_command("enableqcranks", setbadgecmd, help="/enableqcranks true|false. "
+    "Please see "
+    "http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk"
+    " before enabling this.")
 
 def _fmt(s, *args):
     # TODO bold/underline/etc ?
@@ -78,11 +103,25 @@ def qcbot_msg(word, word_eol, userdata, attributes):
         match = userdata[1].match(word[1])
         if match:
             badge, nick, text = match.groups()
+
             # strip colors
             if not _cols:
                 badge = hexchat.strip(badge)
                 nick = hexchat.strip(nick)
-            # TODO tweak badge
+
+            if _badge:
+                # to see this, see http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk
+                if "Mod" in badge:
+                    badge = "\x02\x0307&\x0f"
+                elif "Op" in badge:  # or "SrOp" in badge:  # redundant :P
+                    badge = "\x02\x0304@\x0f"
+                elif "Owner" in badge or "Admin" in badge:
+                    badge = "\x02\x0302~\x0f"
+                elif "Newbie" in badge:
+                    badge = "\x02\x0306?\x0f"
+                else:  # for members
+                    badge = ""
+
             if attributes.time:
                 ctx.emit_print(userdata[0], nick, text, badge, time=attributes.time)
             else:
