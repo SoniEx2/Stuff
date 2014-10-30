@@ -1,15 +1,15 @@
 # Copyright (c) 2014 SoniEx2
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -19,34 +19,69 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "1.0"
+__module_version__ = "1.1.0"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
 import hexchat
 import re
 
-qc_msg_mask = re.compile(r"^<(01\[[^\]]+01\])(.+?)> (.*)")
-qc_action_mask = re.compile(r"^06\* (01\[[^\]]+01\])([^ ]+)06 (.*)")
+# Enable colors by default
+_cols = True
 
-qc_connect_mask = re.compile(r"^\[([^ ]+) connected\]$")
-qc_disconnect_mask = re.compile(r"^\[([^ ]+) disconnected\]$")
+if hexchat.get_pluginpref("queercraft_colors"):
+    # Load color settings
+    _cols = hexchat.get_pluginpref("queercraft_colors") == "True"
 
-qc_player_host = r"player@mc.queercraft.net"
+def setcols(cols):
+    global _cols
+    _cols = cols
+    hexchat.set_pluginpref("queercraft_colors", str(cols))
 
-def is_qc(ctx, word):
+def setcolscmd(word, word_eol, userdata):
+    if len(word) >= 2:
+        if word[1][0].lower() == "t":
+            setcols(True)
+        if word[1][0].lower() == "f":
+            setcols(False)
+
+hexchat.hook_command("enableqccolors", setcolscmd, help="/enableqccolors true|false")
+
+def _fmt(s):
+    # TODO bold/underline/etc ?
+    return s.format(C="\x03",R="\x0f")
+
+def _compile(s):
+    return re.compile(_fmt(s))
+
+qc_msg_mask = _compile(r"^<({C}01\[[^\]]+\{C}01\])(.+?){R}> (.*)")
+qc_action_mask = _compile(r"^{C}06\* ({C}01\[[^\]]+{C}01\])([^ ]+){C}06 (.*)")
+
+qc_connect_mask = _compile(r"^\[([^ ]+) connected\]$")
+qc_disconnect_mask = _compile(r"^\[([^ ]+) disconnected\]$")
+
+qc_player_host = _fmt(r"player@mc.queercraft.net")
+
+def is_qc(ctx):
+    return ctx.get_info("channel").lower() == "#queercraft"
+
+def is_qcbot(ctx, word):
     return (len(word) > 2 and
     hexchat.strip(word[0]) == "QueercraftBOT" and
     word[2] == "+" and
-    ctx.get_info("channel").lower() == "#queercraft" and
-    ctx.get_info("network").lower() == "espernet")
+    is_qc(ctx))
 
 def qcbot_msg(word, word_eol, userdata, attributes):
     ctx = hexchat.get_context();
-    if is_qc(ctx, word):
+    if is_qcbot(ctx, word):
         match = userdata[1].match(word[1])
         if match:
             badge, nick, text = match.groups()
+            # strip colors
+            if not _cols:
+                badge = hexchat.strip(badge)
+                nick = hexchat.strip(nick)
+            # TODO tweak badge
             if attributes.time:
                 ctx.emit_print(userdata[0], nick, text, badge, time=attributes.time)
             else:
@@ -56,10 +91,12 @@ def qcbot_msg(word, word_eol, userdata, attributes):
 
 def qcbot_connect(word, word_eol, userdata, attributes):
     ctx = hexchat.get_context();
-    if is_qc(ctx, word):
+    if is_qcbot(ctx, word):
         match = qc_connect_mask.match(word[1])
         if match:
             nick = match.group(1)
+            if not _cols:
+                nick = hexchat.strip(nick)
             if attributes.time:
                 ctx.emit_print("Join", nick, ctx.get_info("channel"), qc_player_host, time=attributes.time)
             else:
@@ -69,10 +106,12 @@ def qcbot_connect(word, word_eol, userdata, attributes):
 
 def qcbot_disconnect(word, word_eol, userdata, attributes):
     ctx = hexchat.get_context();
-    if is_qc(ctx, word):
+    if is_qcbot(ctx, word):
         match = qc_disconnect_mask.match(word[1])
         if match:
             nick = match.group(1)
+            if not _cols:
+                nick = hexchat.strip(nick)
             if attributes.time:
                 ctx.emit_print("Part", nick, qc_player_host, ctx.get_info("channel"), time=attributes.time)
             else:
