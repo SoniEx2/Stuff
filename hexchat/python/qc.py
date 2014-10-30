@@ -44,15 +44,16 @@ def setcolscmd(word, word_eol, userdata):
             setcols(True)
         if word[1][0].lower() == "f":
             setcols(False)
+    return hexchat.EAT_ALL
 
 hexchat.hook_command("enableqccolors", setcolscmd, help="/enableqccolors true|false")
 
-def _fmt(s):
+def _fmt(s, *args):
     # TODO bold/underline/etc ?
-    return s.format(C="\x03",R="\x0f")
+    return s.format(C="\x03",R="\x0f",*args)
 
-def _compile(s):
-    return re.compile(_fmt(s))
+def _compile(s, *args):
+    return re.compile(_fmt(s, *args))
 
 qc_msg_mask = _compile(r"^<({C}01\[[^\]]+\{C}01\])(.+?){R}> (.*)")
 qc_action_mask = _compile(r"^{C}06\* ({C}01\[[^\]]+{C}01\])([^ ]+){C}06 (.*)")
