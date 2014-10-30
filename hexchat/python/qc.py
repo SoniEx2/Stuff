@@ -52,7 +52,7 @@ hexchat.hook_command("enableqccolors", setcolscmd, help="/enableqccolors true|fa
 _badge = True
 
 if hexchat.get_pluginpref("queercraft_badge"):
-    # Load color settings
+    # Load badge settings
     _badge = hexchat.get_pluginpref("queercraft_badge") == "True"
 
 def setbadge(badge):
