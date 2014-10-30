@@ -19,59 +19,43 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "1.2.0"
+__module_version__ = "1.2.1"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
 import hexchat
 import re
 
-# Enable colors by default
-_cols = True
+makeboolconfig = """
+{var} = {default}
 
-if hexchat.get_pluginpref("queercraft_colors"):
-    # Load color settings
-    _cols = hexchat.get_pluginpref("queercraft_colors") == "True"
+if hexchat.get_pluginpref("queercraft_{pref}"):
+    {var} = hexchat.get_pluginpref("queercraft_{pref}") == "True"
 
-def setcols(cols):
-    global _cols
-    _cols = cols
-    hexchat.set_pluginpref("queercraft_colors", str(cols))
+def set{name}({name}):
+    global {var}
+    {var} = {name}
+    hexchat.set_pluginpref("queercraft_{pref}", str({name}))
 
-def setcolscmd(word, word_eol, userdata):
+def set{name}cmd(word, word_eol, userdata):
     if len(word) >= 2:
         if word[1][0].lower() == "t":
-            setcols(True)
+            set{name}(True)
         if word[1][0].lower() == "f":
-            setcols(False)
+            set{name}(False)
     return hexchat.EAT_ALL
+"""
 
+# make color setting
+exec(makeboolconfig.format(name="cols", pref="colors", var="_cols", default="True"),locals(),globals())
 hexchat.hook_command("enableqccolors", setcolscmd, help="/enableqccolors true|false")
 
-# Enable badge tweaking by default
-_badge = True
-
-if hexchat.get_pluginpref("queercraft_badge"):
-    # Load badge settings
-    _badge = hexchat.get_pluginpref("queercraft_badge") == "True"
-
-def setbadge(badge):
-    global _badge
-    _badge = badge
-    hexchat.set_pluginpref("queercraft_badge", str(badge))
-
-def setbadgecmd(word, word_eol, userdata):
-    if len(word) >= 2:
-        if word[1][0].lower() == "t":
-            setbadge(True)
-        if word[1][0].lower() == "f":
-            setbadge(False)
-    return hexchat.EAT_ALL
-
+#make badge setting
+exec(makeboolconfig.format(name="badge", pref="badge", var="_badge", default="True"),locals(),globals())
 hexchat.hook_command("enableqcranks", setbadgecmd, help="/enableqcranks true|false. "
     "Please see "
     "http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk"
-    " before enabling this.")
+    " before using this.")
 
 def _fmt(s, *args):
     # TODO bold/underline/etc ?
