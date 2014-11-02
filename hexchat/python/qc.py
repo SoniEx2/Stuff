@@ -19,40 +19,49 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "1.2.1"
+__module_version__ = "2.0.0"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
 import hexchat
 import re
 
-makeboolconfig = """
-{var} = {default}
+class BoolConfig:
 
-if hexchat.get_pluginpref("queercraft_{pref}"):
-    {var} = hexchat.get_pluginpref("queercraft_{pref}") == "True"
+    def __init__(self, name, default, **kwargs):
+        self.name = name
+        self.statusmsg = kwargs
+        if hexchat.get_pluginpref("queercraft_{}".format(name)):
+            self.setter(hexchat.get_pluginpref("queercraft_{}".format(name)) == "True")
+        else:
+            self.setter(default)
 
-def set{name}({name}):
-    global {var}
-    {var} = {name}
-    hexchat.set_pluginpref("queercraft_{pref}", str({name}))
+    def setter(self, value):
+        self.value = value
+        hexchat.set_pluginpref("queercraft_{}".format(self.name), str(value))
+        if value and self.statusmsg.get("true",None):
+            hexchat.prnt(self.statusmsg["true"])
+        elif (not value) and self.statusmsg.get("false",None):
+            hexchat.prnt(self.statusmsg["false"])
 
-def set{name}cmd(word, word_eol, userdata):
-    if len(word) >= 2:
-        if word[1][0].lower() == "t":
-            set{name}(True)
-        if word[1][0].lower() == "f":
-            set{name}(False)
-    return hexchat.EAT_ALL
-"""
+    def hexchat_setter(self, word, word_eol, userdata):
+        if len(word) >= 2:
+            if word[1][0].lower() == "t":
+                self.setter(True)
+            if word[1][0].lower() == "f":
+                self.setter(False)
+        return hexchat.EAT_ALL
 
-# make color setting
-exec(makeboolconfig.format(name="cols", pref="colors", var="_cols", default="True"),locals(),globals())
-hexchat.hook_command("enableqccolors", setcolscmd, help="/enableqccolors true|false")
+    def __bool__(self):
+        return self.value
+
+#make color setting
+_cols = BoolConfig("cols", True, true="Colors enabled", false="Colors disabled")
+hexchat.hook_command("enableqccolors", _cols.hexchat_setter, help="/enableqccolors true|false")
 
 #make badge setting
-exec(makeboolconfig.format(name="badge", pref="badge", var="_badge", default="True"),locals(),globals())
-hexchat.hook_command("enableqcranks", setbadgecmd, help="/enableqcranks true|false. "
+_badge = BoolConfig("badge", True, true="Rank symbols enabled", false="Rank symbols disabled")
+hexchat.hook_command("enableqcranks", _badge.hexchat_setter, help="/enableqcranks true|false. "
     "Please see "
     "http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk"
     " before using this.")
