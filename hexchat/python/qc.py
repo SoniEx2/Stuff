@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "2.0.0"
+__module_version__ = "3.0.0"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
@@ -66,20 +66,170 @@ hexchat.hook_command("enableqcranks", _badge.hexchat_setter, help="/enableqcrank
     "http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk"
     " before using this.")
 
-def _fmt(s, *args):
-    # TODO bold/underline/etc ?
-    return s.format(C="\x03",R="\x0f",*args)
+#hexchat parsing stuff
+hexchat_textevent_parser = re.compile("%([%RIBOUCH])")
+hexchat_textevent_map = {
+    '%': '%', # escape
+    'R': '\x16', # swap/reverse
+    'I': '\x1d', # italic
+    'B': '\x02', # bold
+    'O': '\x0f', # reset
+    'U': '\x1f', # underline
+    'C': '\x03', # color
+    'H': '\x08', # hidden
+    }
 
-def _compile(s, *args):
-    return re.compile(_fmt(s, *args))
+def hexchat_sub_escape(matchobj):
+    return hexchat_textevent_map[matchobj.group(1)]
 
-qc_msg_mask = _compile(r"^<({C}01\[[^\]]+\{C}01\])(.+?){R}> (.*)")
-qc_action_mask = _compile(r"^{C}06\* ({C}01\[[^\]]+{C}01\])([^ ]+){C}06 (.*)")
+def hexchat_parse(s):
+    return hexchat_textevent_parser.sub(hexchat_sub_escape, s)
 
-qc_connect_mask = _compile(r"^\[([^ ]+) connected\]$")
-qc_disconnect_mask = _compile(r"^\[([^ ]+) disconnected\]$")
+def compile_colors(s):
+    return re.compile(hexchat_parse(s))
 
-qc_player_host = _fmt(r"player@mc.queercraft.net")
+class Formatting:
+
+    # constants
+    HIDDEN = True
+    VISIBLE = False
+    BOLD = True
+    ITALIC = True
+    UNDERLINE = True
+    NORMAL = False
+
+    # mIRC colors
+    # this is ugly but idk better ;_; blame python 2
+    class COLORS:
+        DEFAULT = 99
+        WHITE = 0
+        BLACK = 1
+        BLUE = 2
+        GREEN = 3
+        RED = 4
+        BROWN = 5
+        PURPLE = 6
+        ORANGE = 7
+        YELLOW = 8
+        LIGHT_GREEN = 9
+        TEAL = 10
+        LIGHT_CYAN = 11
+        LIGHT_BLUE = 12
+        PINK = 13
+        GREY = 14
+        LIGHT_GREY = 15
+        # damn you english
+        GRAY = 14
+        LIGHT_GRAY = 15
+
+        def __init__(self):
+            raise TypeError
+
+    # reset formatting
+    # set outside class
+    RESET = None
+
+    # Formatting(Cf, Cb, H, B, I, U)
+    def __init__(self, foreground, background, hidden, bold, italic, underline):
+        self._foreground = foreground % 100
+        self._background = background % 100
+        self._hidden = hidden
+        self._bold = bold
+        self._italic = italic
+        self._underline = underline
+
+    def set_foreground(self, foreground):
+        return Formatting(foreground, self._background, self._hidden, self._bold, self._italic, self._underline)
+
+    def set_background(self, background):
+        return Formatting(self._foreground, background, self._hidden, self._bold, self._italic, self._underline)
+
+    def set_hidden(self, hidden):
+        return Formatting(self._foreground, self._background, hidden, self._bold, self._italic, self._underline)
+
+    def set_bold(self, bold):
+        return Formatting(self._foreground, self._background, self._hidden, bold, self._italic, self._underline)
+
+    def set_italic(self, italic):
+        return Formatting(self._foreground, self._background, self._hidden, self._bold, italic, self._underline)
+
+    def set_underline(self, underline):
+        return Formatting(self._foreground, self._background, self._hidden, self._bold, self._italic, underline)
+
+    def reverse(self):
+        return Formatting(self._background, self._foreground, self._hidden, self._bold, self._italic, self._underline)
+
+    def __repr__(self):
+        # TODO use names
+        return "Formatting({!r}, {!r}, {!r}, {!r}, {!r}, {!r})".format(
+            self.foreground % 100, self.background % 100,
+            self.hidden, self.bold, self.italic, self.underline
+            )
+
+    def __str__(self):
+        if self == Formatting.RESET:
+            return hexchat_parse("%O")
+        else:
+            s = ["%O"]
+            if self.hidden:
+                s.append("%H")
+            if self.bold:
+                s.append("%B")
+            if self.italic:
+                s.append("%I")
+            if self.underline:
+                s.append("%U")
+            if self.foreground % 100 != Formatting.COLORS.DEFAULT or self.background % 100 != Formatting.COLORS.DEFAULT:
+                s.append("%C{:02d}".format(self.foreground % 100))
+                if self.background != Formatting.COLORS.DEFAULT:
+                    s.append(",{:02d}".format(self.background % 100))
+            return hexchat_parse("".join(s))
+
+    def __format__(self, format_spec):
+        pass
+
+    def __eq__(self, other):
+        return (
+            self.hidden == other.hidden and
+            self.bold == other.bold and
+            self.italic == other.italic and
+            self.underline == other.underline and
+            self.foreground % 100 == other.foreground % 100 and
+            self.background % 100 == other.background % 100
+            )
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        h = self.foreground % 100 | self.background % 100 << 7
+        if self.hidden:
+            h |= 1 << 14
+        if self.bold:
+            h |= 1 << 15
+        if self.underline:
+            h |= 1 << 16
+        if self.italic:
+            h |= 1 << 17
+        return h
+
+    def __bool__(self):
+        return self != Formatting.RESET
+
+# specify RESET
+Formatting.RESET = Formatting(
+        Formatting.COLORS.DEFAULT, Formatting.COLORS.DEFAULT,
+        Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
+        )
+
+
+qc_msg_mask = compile_colors(r"^<(%C01\[[^\]]+\%C01\])(.+?)%O> (.*)")
+qc_action_mask = compile_colors(r"^%C06\* (%C01\[[^\]]+%C01\])([^ ]+)%C06 (.*)")
+
+qc_connect_mask = compile_colors(r"^\[([^ ]+) connected\]$")
+qc_disconnect_mask = compile_colors(r"^\[([^ ]+) disconnected\]$")
+
+qc_player_host = hexchat_parse(r"player@mc.queercraft.net")
 
 def is_qc(ctx):
     return ctx.get_info("channel").lower() == "#queercraft"
@@ -97,23 +247,27 @@ def qcbot_msg(word, word_eol, userdata, attributes):
         if match:
             badge, nick, text = match.groups()
 
+            if _badge:
+                # to see this, see http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk
+                if "Mod" in badge:
+                    badge = "%B%C07&%O"
+                elif "Op" in badge:  # or "SrOp" in badge:  # redundant :P
+                    badge = "%B%C04@%O"
+                elif "Owner" in badge or "Admin" in badge:
+                    badge = "%B%C02~%O"
+                elif "Newbie" in badge:
+                    badge = "%B%C06?%O"
+                else:  # for members
+                    badge = ""
+                badge = hexchat_parse(badge)
+
             # strip colors
             if not _cols:
                 badge = hexchat.strip(badge)
                 nick = hexchat.strip(nick)
-
-            if _badge:
-                # to see this, see http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk
-                if "Mod" in badge:
-                    badge = "\x02\x0307&\x0f"
-                elif "Op" in badge:  # or "SrOp" in badge:  # redundant :P
-                    badge = "\x02\x0304@\x0f"
-                elif "Owner" in badge or "Admin" in badge:
-                    badge = "\x02\x0302~\x0f"
-                elif "Newbie" in badge:
-                    badge = "\x02\x0306?\x0f"
-                else:  # for members
-                    badge = ""
+            else:
+                #evt = hexchat_parse(hexchat.get_info("event_text {}".format(userdata[0])))
+                pass
 
             if attributes.time:
                 ctx.emit_print(userdata[0], nick, text, badge, time=attributes.time)
