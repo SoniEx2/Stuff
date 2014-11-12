@@ -32,3 +32,16 @@ level 2 long string - also shows up as comment on the editor
 fcall_mls"multi\
 line\
 string" -- doesn't show up properly on the editor
+
+indexed.fcall(s)
+indexed.fcall_s"string"
+indexed.fcall_t{s}
+indexed.fcall_ls[[
+long string - also shows up as comment on the editor
+]]
+indexed.fcall_l2ls[==[
+level 2 long string - also shows up as comment on the editor
+]==]
+indexed.fcall_mls"multi\
+line\
+string" -- doesn't show up properly on the editor
