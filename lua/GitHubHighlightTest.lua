@@ -45,3 +45,36 @@ level 2 long string - also shows up as comment on the editor
 indexed.fcall_mls"multi\
 line\
 string" -- doesn't show up properly on the editor
+
+ffi.cdef[[
+typedef union my_union {
+  uint8_t *ub;
+  int8_t *b;
+  uint16_t *uw;
+  int16_t *w;
+  uint32_t *ul;
+  int32_t *l; // c comment
+} my_union_t;
+]]
+
+cdef[[
+typedef union my_union {
+  uint8_t *ub;
+  int8_t *b;
+  uint16_t *uw;
+  int16_t *w;
+  uint32_t *ul;
+  int32_t *l; // c comment
+} my_union_t;
+]]
+
+cls = [[
+typedef union my_union {
+  uint8_t *ub;
+  int8_t *b;
+  uint16_t *uw;
+  int16_t *w;
+  uint32_t *ul;
+  int32_t *l; // c comment
+} my_union_t;
+]]
