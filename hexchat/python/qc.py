@@ -102,6 +102,7 @@ class Formatting:
     # this is ugly but idk better ;_; blame python 2
     class COLORS:
         DEFAULT = 99
+        NO_CHANGE = -1
         WHITE = 0
         BLACK = 1
         BLUE = 2
@@ -138,26 +139,50 @@ class Formatting:
         self._italic = italic
         self._underline = underline
 
+    @property
+    def foreground(self):
+        return self._foreground
+
+    @property
+    def background(self):
+        return self._background
+
+    @property
+    def hidden(self):
+        return self._hidden
+
+    @property
+    def bold(self):
+        return self._bold
+
+    @property
+    def italic(self):
+        return self._italic
+
+    @property
+    def underline(self):
+        return self._underline
+
     def set_foreground(self, foreground):
-        return Formatting(foreground, self._background, self._hidden, self._bold, self._italic, self._underline)
+        return Formatting(foreground, self.background, self.hidden, self.bold, self.italic, self.underline)
 
     def set_background(self, background):
-        return Formatting(self._foreground, background, self._hidden, self._bold, self._italic, self._underline)
+        return Formatting(self.foreground, background, self.hidden, self.bold, self.italic, self.underline)
 
     def set_hidden(self, hidden):
-        return Formatting(self._foreground, self._background, hidden, self._bold, self._italic, self._underline)
+        return Formatting(self.foreground, self.background, hidden, self.bold, self.italic, self.underline)
 
     def set_bold(self, bold):
-        return Formatting(self._foreground, self._background, self._hidden, bold, self._italic, self._underline)
+        return Formatting(self.foreground, self.background, self.hidden, bold, self.italic, self.underline)
 
     def set_italic(self, italic):
-        return Formatting(self._foreground, self._background, self._hidden, self._bold, italic, self._underline)
+        return Formatting(self.foreground, self.background, self.hidden, self.bold, italic, self.underline)
 
     def set_underline(self, underline):
-        return Formatting(self._foreground, self._background, self._hidden, self._bold, self._italic, underline)
+        return Formatting(self.foreground, self.background, self.hidden, self.bold, self.italic, underline)
 
     def reverse(self):
-        return Formatting(self._background, self._foreground, self._hidden, self._bold, self._italic, self._underline)
+        return Formatting(self.background, self.foreground, self.hidden, self.bold, self.italic, self.underline)
 
     def __repr__(self):
         # TODO use names
@@ -167,26 +192,23 @@ class Formatting:
             )
 
     def __str__(self):
-        if self == Formatting.RESET:
-            return hexchat_parse("%O")
-        else:
-            s = ["%O"]
-            if self.hidden:
-                s.append("%H")
-            if self.bold:
-                s.append("%B")
-            if self.italic:
-                s.append("%I")
-            if self.underline:
-                s.append("%U")
-            if self.foreground % 100 != Formatting.COLORS.DEFAULT or self.background % 100 != Formatting.COLORS.DEFAULT:
-                s.append("%C{:02d}".format(self.foreground % 100))
-                if self.background != Formatting.COLORS.DEFAULT:
-                    s.append(",{:02d}".format(self.background % 100))
-            return hexchat_parse("".join(s))
+        return format(self)
 
     def __format__(self, format_spec):
-        pass
+        s = []
+        if self.hidden:
+            s.append("%H")
+        if self.bold:
+            s.append("%B")
+        if self.italic:
+            s.append("%I")
+        if self.underline:
+            s.append("%U")
+        if self.foreground % 100 != Formatting.COLORS.NO_CHANGE:
+            s.append("%C{:02d}".format(self.foreground % 100))
+            if self.background != Formatting.COLORS.NO_CHANGE:
+                s.append(",{:02d}".format(self.background % 100))
+        return hexchat_parse("".join(s))
 
     def __eq__(self, other):
         return (
@@ -200,6 +222,32 @@ class Formatting:
 
     def __ne__(self, other):
         return not self == other
+
+    # This gives you the result of combining self with other, that is:
+    # Formatting(10, 10, HIDDEN, BOLD, ITALIC, UNDERLINE) +
+    # Formatting(NO_CHANGE, NO_CHANGE, HIDDEN, BOLD, ITALIC, UNDERLINE) =
+    # Formatting(10, 10, VISIBLE, NORMAL, NORMAL, NORMAL)
+    def __add__(self, other):
+        if not isinstance(self, Formatting) or not isinstance(other, Formatting):
+            raise NotImplemented
+        return Formatting(
+            self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.background,
+            self.background if other.background == Formatting.COLORS.NO_CHANGE else other.background,
+            self.hidden ^ other.hidden,
+            self.bold ^ other.bold,
+            self.italic ^ other.italic,
+            self.underline ^ other.underline
+            )
+
+    # This calculates a formatting that when combined with self returns other, that is:
+    # Formatting(10, 10, HIDDEN, BOLD, ITALIC, UNDERLINE) -
+    # Formatting(1, 1, HIDDEN, BOLD, ITALIC, UNDERLINE) =
+    # Formatting(1, 1, VISIBLE, NORMAL, NORMAL, NORMAL)
+    # Note: Color NO_CHANGE is special: anything - NO_CHANGE = anything
+    def __sub__(self, other):
+        if not isinstance(self, Formatting) or not isinstance(other, Formatting):
+            raise NotImplemented
+        return self + other
 
     def __hash__(self):
         h = self.foreground % 100 | self.background % 100 << 7
@@ -216,7 +264,7 @@ class Formatting:
     def __bool__(self):
         return self != Formatting.RESET
 
-# specify RESET
+# define RESET
 Formatting.RESET = Formatting(
         Formatting.COLORS.DEFAULT, Formatting.COLORS.DEFAULT,
         Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
