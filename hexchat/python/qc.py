@@ -26,6 +26,7 @@ __module_author__ = "SoniEx2"
 import hexchat
 import re
 
+
 class BoolConfig:
 
     def __init__(self, name, default, **kwargs):
@@ -39,9 +40,9 @@ class BoolConfig:
     def setter(self, value):
         self.value = value
         hexchat.set_pluginpref("queercraft_{}".format(self.name), str(value))
-        if value and self.statusmsg.get("true",None):
+        if value and self.statusmsg.get("true", None):
             hexchat.prnt(self.statusmsg["true"])
-        elif (not value) and self.statusmsg.get("false",None):
+        elif (not value) and self.statusmsg.get("false", None):
             hexchat.prnt(self.statusmsg["false"])
 
     def hexchat_setter(self, word, word_eol, userdata):
@@ -63,30 +64,35 @@ hexchat.hook_command("enableqccolors", _cols.hexchat_setter, help="/enableqccolo
 _badge = BoolConfig("badge", True, true="Rank symbols enabled", false="Rank symbols disabled")
 hexchat.hook_command("enableqcranks", _badge.hexchat_setter, help="/enableqcranks true|false. "
     "Please see "
-    "http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk"
+    "http://hexchat.readthedocs.org/en/latest/faq.html"  # use a full link here
+    "#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk"
     " before using this.")
 
 #hexchat parsing stuff
 hexchat_textevent_parser = re.compile("%([%RIBOUCH])")
 hexchat_textevent_map = {
-    '%': '%', # escape
-    'R': '\x16', # swap/reverse
-    'I': '\x1d', # italic
-    'B': '\x02', # bold
-    'O': '\x0f', # reset
-    'U': '\x1f', # underline
-    'C': '\x03', # color
-    'H': '\x08', # hidden
+    '%': '%',     # escape
+    'R': '\x16',  # swap/reverse
+    'I': '\x1d',  # italic
+    'B': '\x02',  # bold
+    'O': '\x0f',  # reset
+    'U': '\x1f',  # underline
+    'C': '\x03',  # color
+    'H': '\x08',  # hidden
     }
+
 
 def hexchat_sub_escape(matchobj):
     return hexchat_textevent_map[matchobj.group(1)]
 
+
 def hexchat_parse(s):
     return hexchat_textevent_parser.sub(hexchat_sub_escape, s)
 
+
 def compile_colors(s):
     return re.compile(hexchat_parse(s))
+
 
 class Formatting:
 
@@ -141,11 +147,11 @@ class Formatting:
 
     @property
     def foreground(self):
-        return self._foreground
+        return self._foreground % 100
 
     @property
     def background(self):
-        return self._background
+        return self._background % 100
 
     @property
     def hidden(self):
@@ -187,7 +193,7 @@ class Formatting:
     def __repr__(self):
         # TODO use names
         return "Formatting({!r}, {!r}, {!r}, {!r}, {!r}, {!r})".format(
-            self.foreground % 100, self.background % 100,
+            self.foreground, self.background,
             self.hidden, self.bold, self.italic, self.underline
             )
 
@@ -204,10 +210,10 @@ class Formatting:
             s.append("%I")
         if self.underline:
             s.append("%U")
-        if self.foreground % 100 != Formatting.COLORS.NO_CHANGE:
-            s.append("%C{:02d}".format(self.foreground % 100))
+        if self.foreground != Formatting.COLORS.NO_CHANGE:
+            s.append("%C{:02d}".format(self.foreground))
             if self.background != Formatting.COLORS.NO_CHANGE:
-                s.append(",{:02d}".format(self.background % 100))
+                s.append(",{:02d}".format(self.background))
         return hexchat_parse("".join(s))
 
     def __eq__(self, other):
@@ -216,8 +222,8 @@ class Formatting:
             self.bold == other.bold and
             self.italic == other.italic and
             self.underline == other.underline and
-            self.foreground % 100 == other.foreground % 100 and
-            self.background % 100 == other.background % 100
+            self.foreground == other.foreground and
+            self.background == other.background
             )
 
     def __ne__(self, other):
@@ -250,7 +256,7 @@ class Formatting:
         return self + other
 
     def __hash__(self):
-        h = self.foreground % 100 | self.background % 100 << 7
+        h = self.foreground | self.background << 7
         if self.hidden:
             h |= 1 << 14
         if self.bold:
@@ -279,8 +285,10 @@ qc_disconnect_mask = compile_colors(r"^\[([^ ]+) disconnected\]$")
 
 qc_player_host = hexchat_parse(r"player@mc.queercraft.net")
 
+
 def is_qc(ctx):
     return ctx.get_info("channel").lower() == "#queercraft"
+
 
 def is_qcbot(ctx, word):
     return (len(word) > 2 and
@@ -288,15 +296,16 @@ def is_qcbot(ctx, word):
     word[2] == "+" and
     is_qc(ctx))
 
+
 def qcbot_msg(word, word_eol, userdata, attributes):
-    ctx = hexchat.get_context();
+    ctx = hexchat.get_context()
     if is_qcbot(ctx, word):
         match = userdata[1].match(word[1])
         if match:
             badge, nick, text = match.groups()
 
             if _badge:
-                # to see this, see http://hexchat.readthedocs.org/en/latest/faq.html#how-do-i-show-and-in-front-of-nicknames-that-are-op-and-voice-when-they-talk
+                # to see this, see http://tinyurl.com/hexchatbadge
                 if "Mod" in badge:
                     badge = "%B%C07&%O"
                 elif "Op" in badge:  # or "SrOp" in badge:  # redundant :P
@@ -324,8 +333,9 @@ def qcbot_msg(word, word_eol, userdata, attributes):
             return hexchat.EAT_ALL
     return hexchat.EAT_NONE
 
+
 def qcbot_connect(word, word_eol, userdata, attributes):
-    ctx = hexchat.get_context();
+    ctx = hexchat.get_context()
     if is_qcbot(ctx, word):
         match = qc_connect_mask.match(word[1])
         if match:
@@ -339,8 +349,9 @@ def qcbot_connect(word, word_eol, userdata, attributes):
             return hexchat.EAT_ALL
     return hexchat.EAT_NONE
 
+
 def qcbot_disconnect(word, word_eol, userdata, attributes):
-    ctx = hexchat.get_context();
+    ctx = hexchat.get_context()
     if is_qcbot(ctx, word):
         match = qc_disconnect_mask.match(word[1])
         if match:
@@ -365,6 +376,7 @@ hexchat.hook_print_attrs("Channel Message", qcbot_connect)
 hexchat.hook_print_attrs("Channel Msg Hilight", qcbot_connect)
 hexchat.hook_print_attrs("Channel Message", qcbot_disconnect)
 hexchat.hook_print_attrs("Channel Msg Hilight", qcbot_disconnect)
+
 
 def unload(userdata):
     print("qc.py unloaded")
