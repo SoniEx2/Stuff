@@ -113,6 +113,8 @@ class Formatting:
     class COLORS:
         DEFAULT = 99
         NO_CHANGE = -1
+        DEFAULT_FG = -2
+        DEFAULT_BG = -3
         WHITE = 0
         BLACK = 1
         BLUE = 2
@@ -142,8 +144,10 @@ class Formatting:
 
     # Formatting(Cf, Cb, H, B, I, U)
     def __init__(self, foreground, background, hidden, bold, italic, underline):
-        self._foreground = foreground % 100
-        self._background = background % 100
+        self._foreground = foreground
+        self._background = background
+        self._foreground = self.foreground  # heh
+        self._background = self.background
         self._hidden = hidden
         self._bold = bold
         self._italic = italic
@@ -151,11 +155,11 @@ class Formatting:
 
     @property
     def foreground(self):
-        return self._foreground % 100
+        return self._foreground if self._foreground < 0 and self._foreground >= -3 else self._foreground % 100
 
     @property
     def background(self):
-        return self._background % 100
+        return self._background if self._background < 0 and self._background >= -3 else self._background % 100
 
     @property
     def hidden(self):
@@ -206,6 +210,7 @@ class Formatting:
 
     def __format__(self, format_spec):
         s = []
+        # TODO use %R when foreground == DEFAULT_BG and/or background == DEFAULT_FG
         if self.hidden:
             s.append("%H")
         if self.bold:
@@ -257,7 +262,14 @@ class Formatting:
     def __sub__(self, other):
         if not isinstance(self, Formatting) or not isinstance(other, Formatting):
             raise NotImplemented
-        return self + other
+        return Formatting(
+            self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.background,
+            self.background if other.background == Formatting.COLORS.NO_CHANGE else other.background,
+            self.hidden ^ other.hidden,
+            self.bold ^ other.bold,
+            self.italic ^ other.italic,
+            self.underline ^ other.underline
+            )
 
     def __hash__(self):
         h = self.foreground | self.background << 7
@@ -272,15 +284,41 @@ class Formatting:
         return h
 
     def __bool__(self):
-        return self != Formatting.RESET
+        return self != Formatting.NO_CHANGE
 
 # define RESET
 Formatting.RESET = Formatting(
-        Formatting.COLORS.DEFAULT, Formatting.COLORS.DEFAULT,
+        Formatting.COLORS.DEFAULT_FG, Formatting.COLORS.DEFAULT_BG,
+        Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
+        )
+
+Formatting.NO_CHANGE = Formatting(
+        Formatting.COLORS.NO_CHANGE, Formatting.COLORS.NO_CHANGE,
         Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
         )
 
 parse_mask = compile_colors(r"(%R|%I|%B|%O|%U|%C(\d{1,2},\d{1,2}|\d{0,2})?|%H)")
+formattings = {
+    #hexchat_parse("%R"): special
+    hexchat_parse("%I"): Formatting(
+                    Formatting.COLORS.NO_CHANGE, Formatting.COLORS.NO_CHANGE,
+                    Formatting.VISIBLE, Formatting.NORMAL, Formatting.ITALIC, Formatting.NORMAL
+                    ),
+    hexchat_parse("%B"): Formatting(
+                    Formatting.COLORS.NO_CHANGE, Formatting.COLORS.NO_CHANGE,
+                    Formatting.VISIBLE, Formatting.BOLD, Formatting.NORMAL, Formatting.NORMAL
+                    ),
+    hexchat_parse("%O"): Formatting.RESET,
+    hexchat_parse("%U"): Formatting(
+                    Formatting.COLORS.NO_CHANGE, Formatting.COLORS.NO_CHANGE,
+                    Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.UNDERLINE
+                    ),
+    #hexchat_parse("%C"): special
+    hexchat_parse("%H"): Formatting(
+                    Formatting.COLORS.NO_CHANGE, Formatting.COLORS.NO_CHANGE,
+                    Formatting.HIDDEN, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
+                    )
+    }
 
 
 def parse(ircstring):
@@ -291,30 +329,42 @@ def parse(ircstring):
     l = []
     last = 0
     for matchobj in parse_mask.finditer(ircstring):
-        l.append(matchobj.string[last:matchobj.start()])
+        if matchobj.string[last:matchobj.start()]:
+            l.append(matchobj.string[last:matchobj.start()])
         x = matchobj.group()[0]
-        # TODO combine Formattings
+        base = l.pop() if l and isinstance(l[-1], Formatting) else Formatting.NO_CHANGE
         if x == hexchat_parse("%C"):  # maybe I should cache this somewhere
             colors = [int(x) for x in matchobj.group(2).split(",") if x]
             if len(colors) == 0:
-                l.append(Formatting(
+                l.append(base + Formatting(
                     Formatting.COLORS.DEFAULT, Formatting.COLORS.DEFAULT,
                     Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
                     )
                     )
             elif len(colors) == 1:
-                l.append(Formatting(
+                l.append(base + Formatting(
                     colors[0], Formatting.COLORS.DEFAULT,
                     Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
                     )
                     )
             elif len(colors) == 2:
-                l.append(Formatting(
+                l.append(base + Formatting(
                     colors[0], colors[1],
                     Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
                     )
                     )
-        # TODO do this properly
+        elif x == hexchat_parse("%R"):
+            if base:
+                l.append(base)
+            for item in reversed(l):
+                if isinstance(item, Formatting):
+                    if item.background != -1 or item.foreground != -1:
+                        l.append(item.reverse())
+                        break
+            else:
+                l.append(Formatting.RESET.reverse())
+        else:
+            l.append(base + formattings[x])
         last = matchobj.end()
     if ircstring[last:]:
         l.append(ircstring[last:])
