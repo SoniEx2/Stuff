@@ -316,6 +316,8 @@ def parse(ircstring):
                     )
         # TODO do this properly
         last = matchobj.end()
+    if ircstring[last:]:
+        l.append(ircstring[last:])
     return l
 
 
