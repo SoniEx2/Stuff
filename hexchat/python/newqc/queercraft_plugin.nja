@@ -1,0 +1,7 @@
+{
+  "venv": "", 
+  "project-type": "Import from sources", 
+  "name": "Queercraft Plugin", 
+  "license": "MIT License", 
+  "description": "Queercraft Self-Contained Self-Extracing Self-Building HexChat Plugin."
+}

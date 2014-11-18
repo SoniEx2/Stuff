@@ -95,7 +95,11 @@ def compile_colors(s):
 
 
 class Formatting:
+    """IRC Attribute/formatting stuff.
 
+    Notes:
+    Add target formatting to current formatting before printing.
+    """
     # constants
     HIDDEN = True
     VISIBLE = False
@@ -276,6 +280,51 @@ Formatting.RESET = Formatting(
         Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
         )
 
+parse_mask = compile_colors(r"(%R|%I|%B|%O|%U|%C(\d{1,2},\d{1,2}|\d{0,2})?|%H)")
+
+
+def parse(ircstring):
+    """Parse attributes/formatting on an IRC string.
+
+    The passed string MUST use mIRC attribute codes, NOT HexChat's %x attrubute codes.
+    If you have a string with HexChat's attribute codes, pass it through hexchat_parse(s) first."""
+    l = []
+    last = 0
+    for matchobj in parse_mask.finditer(ircstring):
+        l.append(matchobj.string[last:matchobj.start()])
+        x = matchobj.group()[0]
+        # TODO combine Formattings
+        if x == hexchat_parse("%C"):  # maybe I should cache this somewhere
+            colors = [int(x) for x in matchobj.group(2).split(",") if x]
+            if len(colors) == 0:
+                l.append(Formatting(
+                    Formatting.COLORS.DEFAULT, Formatting.COLORS.DEFAULT,
+                    Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
+                    )
+                    )
+            elif len(colors) == 1:
+                l.append(Formatting(
+                    colors[0], Formatting.COLORS.DEFAULT,
+                    Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
+                    )
+                    )
+            elif len(colors) == 2:
+                l.append(Formatting(
+                    colors[0], colors[1],
+                    Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
+                    )
+                    )
+        # TODO do this properly
+        last = matchobj.end()
+    return l
+
+
+# For debugging uncomment lines below
+#def test_parse(word, word_eol, userdata):
+#    hexchat.prnt(repr(parse(hexchat_parse(word_eol[0]))))
+#    return hexchat.EAT_ALL
+#
+#hexchat.hook_command("testparse", test_parse)
 
 qc_msg_mask = compile_colors(r"^<(%C01\[[^\]]+\%C01\])(.+?)%O> (.*)")
 qc_action_mask = compile_colors(r"^%C06\* (%C01\[[^\]]+%C01\])([^ ]+)%C06 (.*)")
