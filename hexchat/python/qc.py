@@ -94,7 +94,7 @@ def compile_colors(s):
     return re.compile(hexchat_parse(s))
 
 
-class Formatting:
+class Formatting(object):
     """IRC Attribute/formatting stuff.
 
     Notes:
