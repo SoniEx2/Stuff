@@ -210,7 +210,6 @@ class Formatting(object):
 
     def __format__(self, format_spec):
         s = []
-        # TODO use %R when foreground == DEFAULT_BG and/or background == DEFAULT_FG
         if self.hidden:
             s.append("%H")
         if self.bold:
@@ -219,10 +218,19 @@ class Formatting(object):
             s.append("%I")
         if self.underline:
             s.append("%U")
-        if self.foreground != Formatting.COLORS.NO_CHANGE:
-            s.append("%C{:02d}".format(self.foreground))
-            if self.background != Formatting.COLORS.NO_CHANGE:
-                s.append(",{:02d}".format(self.background))
+        foreground = self.foreground
+        background = self.background
+        if foreground < -1:
+            foreground = 99
+        if background < -1:
+            background = 99
+        if foreground != Formatting.COLORS.NO_CHANGE:
+            s.append("%C{:02d}".format(foreground))
+            if background != Formatting.COLORS.NO_CHANGE:
+                s.append(",{:02d}".format(background))
+        if self.foreground == Formatting.COLORS.DEFAULT_BG or self.background == Formatting.COLORS.DEFAULT_FG:
+            # TODO handle foreground == background
+            s.append("%R")
         return hexchat_parse("".join(s))
 
     def __eq__(self, other):
@@ -373,7 +381,9 @@ def parse(ircstring):
 
 # For debugging uncomment lines below
 #def test_parse(word, word_eol, userdata):
-#    hexchat.prnt(repr(parse(hexchat_parse(word_eol[0]))))
+#    l = parse(hexchat_parse(word_eol[0]))
+#    hexchat.prnt(repr(l))
+#    hexchat.prnt(repr([str(x) for x in l]))
 #    return hexchat.EAT_ALL
 #
 #hexchat.hook_command("testparse", test_parse)
