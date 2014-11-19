@@ -280,7 +280,7 @@ class Formatting(object):
             )
 
     def __hash__(self):
-        h = self.foreground | self.background << 7
+        h = (self.foreground if self.foreground >= 0 else 99) | (self.background if self.background >= 0 else 99) << 7
         if self.hidden:
             h |= 1 << 14
         if self.bold:
@@ -295,6 +295,7 @@ class Formatting(object):
         return self != Formatting.NO_CHANGE
 
 # define RESET
+# BUG: for some reason this gets printed as if both FG = -3 AND BG = -3?
 Formatting.RESET = Formatting(
         Formatting.COLORS.DEFAULT_FG, Formatting.COLORS.DEFAULT_BG,
         Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
