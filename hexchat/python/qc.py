@@ -254,7 +254,7 @@ class Formatting(object):
         if not isinstance(self, Formatting) or not isinstance(other, Formatting):
             raise NotImplemented
         return Formatting(
-            self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.background,
+            self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.foreground,
             self.background if other.background == Formatting.COLORS.NO_CHANGE else other.background,
             self.hidden ^ other.hidden,
             self.bold ^ other.bold,
@@ -271,7 +271,7 @@ class Formatting(object):
         if not isinstance(self, Formatting) or not isinstance(other, Formatting):
             raise NotImplemented
         return Formatting(
-            self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.background,
+            self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.foreground,
             self.background if other.background == Formatting.COLORS.NO_CHANGE else other.background,
             self.hidden ^ other.hidden,
             self.bold ^ other.bold,
@@ -295,7 +295,6 @@ class Formatting(object):
         return self != Formatting.NO_CHANGE
 
 # define RESET
-# BUG: for some reason this gets printed as if both FG = -3 AND BG = -3?
 Formatting.RESET = Formatting(
         Formatting.COLORS.DEFAULT_FG, Formatting.COLORS.DEFAULT_BG,
         Formatting.VISIBLE, Formatting.NORMAL, Formatting.NORMAL, Formatting.NORMAL
