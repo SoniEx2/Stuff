@@ -6,7 +6,7 @@ Rationale
 
 Garbage collection is a complicated thing. Here we explore a different kind of GC,
 which as far as I know is not used by anything. It aims to solve no problem other
-than to use more RAM than conventional GCs. Because more RAM usage = better GC.
+than to use more RAM than conventional GCs. Because bigger = better.
 
 How conventional garbage collection works
 -------------------------
