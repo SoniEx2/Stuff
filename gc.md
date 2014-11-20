@@ -42,8 +42,8 @@ also increment its counter by 1.
 After step 2 is done you want to iterate your object list and destroy all the objects
 which have their counter still set to 0. This is your garbage collection cycle done!
 
-Conclusion
-----------
+Notes
+-----
 
 Don't do this. It's bad. It's silly. You don't even need an integer, or a hash table
 for that matter, a boolean would do just fine.
