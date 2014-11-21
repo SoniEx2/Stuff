@@ -1,6 +1,7 @@
 local next,type,rawset = next,type,rawset
 
-local function deep(inp,copies)
+-- deepcopy for long tables
+local function deep_mode1(inp,copies)
   if type(inp) ~= "table" then
     return inp
   end
@@ -18,6 +19,41 @@ local function deep(inp,copies)
   return out
 end
 
+-- deepcopy for long chains
+local function check(obj, todo, copies, count)
+  if copies[obj] ~= nil then
+    return copies[obj], count
+  elseif type(obj) == "table" then
+    local t = {}
+    todo[obj] = t
+    copies[obj] = t
+    return t, count + 1
+  end
+  return obj, count
+end
+local function deep_mode2(inp, copies)
+  local out, todo = {}, {}
+  copies = copies or {}
+  todo[inp], copies[inp] = out, out
+
+  -- we can't use pairs() here because we modify todo
+  while next(todo) do
+    local i, o = next(todo)
+    todo[i] = nil
+    local count = 0
+    for k, v in next, i do
+      if count > 3 then
+        -- use alt mode
+      end
+      local nk, count = check(k, todo, copies, count)
+      local nv, count = check(v, todo, copies, count)
+      rawset(o, nk, nv)
+    end
+  end
+  return out
+end
+
+
 local function shallow(inp)
   local out = {}
   for key,value in next,inp do -- skip metatables by using next directly
@@ -28,7 +64,18 @@ end
 -- set table.copy.shallow and table.copy.deep
 -- we could also set the metatable so that calling it calls table.copy.deep
 -- (or turn it into table.copy(table,deep) where deep is a boolean)
-table.copy={shallow=shallow,deep=deep}
+table.copy = {
+  shallow = shallow,
+  
+  -- best for copying _G
+  deep = deep_mode1,
+  
+  -- best for copying long chains
+  deep_chain = deep_mode1,
+  
+  -- best for copying long tables
+  deep_long = deep_mode2
+}
 
 -- ////////////
 -- // ADDONS //
@@ -43,7 +90,7 @@ local mtdeepcopy_mt = {
 }
 
 table.copy.deep_keep_metatable = function(inp)
-  return deep(inp,setmetatable({},mtdeepcopy_mt))
+  return table.copy.deep(inp,setmetatable({},mtdeepcopy_mt))
 end
 -- END metatable deep copy
 
@@ -58,6 +105,6 @@ local mtshallowcopy_mt = {
 }
 
 table.copy.shallow_keep_metatable = function(inp)
-  return deep(inp,setmetatable({},mtshallowcopy_mt))
+  return table.copy.deep(inp,setmetatable({},mtshallowcopy_mt))
 end
 -- END metatable shallow copy
