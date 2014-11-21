@@ -1,8 +1,14 @@
 local next,type,rawset = next,type,rawset
 
+local gmt = debug and debug.getmetatable or getmetatable
+
 -- deepcopy for long tables
 local function deep_mode1(inp,copies)
-  if type(inp) ~= "table" then
+  if type(gmt(inp)) == "table" and gmt(inp).__copy then
+    local c = gmt(inp).__copy(inp)
+    if copies then copies[inp] = c end
+    return c
+  elseif type(inp) ~= "table" then
     return inp
   end
   local out = {}
@@ -14,24 +20,31 @@ local function deep_mode1(inp,copies)
     -- we can't do normal assignment here because metatabled copies tables might set metatables
     
     -- out[copies[key] or deep(key,copies)]=copies[value] or deep(value,copies)
-    rawset(out,copies[key] or deep(key,copies),copies[value] or deep(value,copies))
+    rawset(out,copies[key] or deep_mode1(key,copies),copies[value] or deep_mode1(value,copies))
   end
   return out
 end
 
 -- deepcopy for long chains
-local function check(obj, todo, copies, count)
+local function check(obj, todo, copies)
   if copies[obj] ~= nil then
-    return copies[obj], count
+    return copies[obj]
+  elseif type(gmt(obj)) == "table" and gmt(obj).__copy then
+    local c = gmt(obj).__copy(obj)
+    copies[obj] = c
+    return c
   elseif type(obj) == "table" then
     local t = {}
     todo[obj] = t
     copies[obj] = t
-    return t, count + 1
+    return t
   end
-  return obj, count
+  return obj
 end
 local function deep_mode2(inp, copies)
+  if type(gmt(inp)) == "table" and gmt(inp).__copy then
+    return gmt(inp).__copy(inp)
+  end
   local out, todo = {}, {}
   copies = copies or {}
   todo[inp], copies[inp] = out, out
@@ -40,14 +53,8 @@ local function deep_mode2(inp, copies)
   while next(todo) do
     local i, o = next(todo)
     todo[i] = nil
-    local count = 0
     for k, v in next, i do
-      if count > 3 then
-        -- use alt mode
-      end
-      local nk, count = check(k, todo, copies, count)
-      local nv, count = check(v, todo, copies, count)
-      rawset(o, nk, nv)
+      rawset(o, check(k, todo, copies), check(v, todo, copies))
     end
   end
   return out
