@@ -94,6 +94,20 @@ def compile_colors(s):
     return re.compile(hexchat_parse(s))
 
 
+def compress_colors(s):
+    skip = 0
+    ns = []
+    for pos, token in enumerate(s):
+        if not skip:
+            ns.append(token)
+        else:
+            skip -= 1
+        if token == "\x03":
+            if s[pos + 1] == "0" and s[pos + 2] in '0123456789' and not s[pos + 3] in '0123456789':
+                skip = 1
+    return "".join(ns)
+
+
 class Formatting(object):
     """IRC Attribute/formatting stuff.
 
@@ -438,9 +452,9 @@ def qcbot_msg(word, word_eol, userdata, attributes):
                 pass
 
             if attributes.time:
-                ctx.emit_print(userdata[0], nick, text, badge, time=attributes.time)
+                ctx.emit_print(userdata[0], compress_colors(nick), text, badge, time=attributes.time)
             else:
-                ctx.emit_print(userdata[0], nick, text, badge)
+                ctx.emit_print(userdata[0], compress_colors(nick), text, badge)
             return hexchat.EAT_ALL
     return hexchat.EAT_NONE
 
@@ -454,9 +468,10 @@ def qcbot_connect(word, word_eol, userdata, attributes):
             if not _cols:
                 nick = hexchat.strip(nick)
             if attributes.time:
-                ctx.emit_print("Join", nick, ctx.get_info("channel"), qc_player_host, time=attributes.time)
+                ctx.emit_print("Join", compress_colors(nick), ctx.get_info("channel"), qc_player_host,
+                    time=attributes.time)
             else:
-                ctx.emit_print("Join", nick, ctx.get_info("channel"), qc_player_host)
+                ctx.emit_print("Join", compress_colors(nick), ctx.get_info("channel"), qc_player_host)
             return hexchat.EAT_ALL
     return hexchat.EAT_NONE
 
@@ -470,9 +485,10 @@ def qcbot_disconnect(word, word_eol, userdata, attributes):
             if not _cols:
                 nick = hexchat.strip(nick)
             if attributes.time:
-                ctx.emit_print("Part", nick, qc_player_host, ctx.get_info("channel"), time=attributes.time)
+                ctx.emit_print("Part", compress_colors(nick), qc_player_host, ctx.get_info("channel"),
+                    time=attributes.time)
             else:
-                ctx.emit_print("Part", nick, qc_player_host, ctx.get_info("channel"))
+                ctx.emit_print("Part", compress_colors(nick), qc_player_host, ctx.get_info("channel"))
             return hexchat.EAT_ALL
     return hexchat.EAT_NONE
 
