@@ -103,8 +103,15 @@ def compress_colors(s):
         else:
             skip -= 1
         if token == "\x03":
-            if s[pos + 1] == "0" and s[pos + 2] in '0123456789' and not s[pos + 3] in '0123456789':
-                skip = 1
+            try:
+                if s[pos + 1] == "0" and s[pos + 2] in '0123456789' and not s[pos + 3] in '0123456789':
+                    skip = 1
+            except IndexError:
+                try:
+                    if s[pos + 1] == "0" and s[pos + 2] in '0123456789':
+                        skip = 1
+                except IndexError:
+                    pass
     return "".join(ns)
 
 
