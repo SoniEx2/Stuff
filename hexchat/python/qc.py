@@ -424,7 +424,7 @@ def is_qc(ctx):
 
 def is_qcbot(ctx, word):
     return (len(word) > 2 and
-    hexchat.strip(word[0]) == "QueercraftBOT" and
+    hexchat.strip(word[0]) == "QCChat" and
     word[2] == "+" and
     is_qc(ctx))
 
