@@ -21,7 +21,10 @@ local function deep_mode1(inp,copies)
 
   local status, out = trycopy(inp)
   if status then
-    return copy
+    if type(copies) == "table" then
+      copies[inp] = out
+    end
+    return out
   end
 
   if type(inp) ~= "table" then
