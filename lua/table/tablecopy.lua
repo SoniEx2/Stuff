@@ -1,4 +1,4 @@
-local next,type,rawset,pcall = next,type,rawset,pcall
+local next,type,rawset,rawget,pcall = next,type,rawset,rawget,pcall
 
 local gmt = debug and debug.getmetatable or getmetatable
 
@@ -6,9 +6,9 @@ local function trycopy(obj)
   local mt = gmt(obj)
 
   -- do we have a metatable? does it have a __copy method?
-  if type(mt) == "table" and mt.__copy then
+  if type(mt) == "table" and rawget(mt, "__copy") then
     -- try to call it (this supports __call-ables too)
-    return pcall(mt.__copy, obj)
+    return pcall(rawget(mt, "__copy"), obj)
   else
     return false
   end
