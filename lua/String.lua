@@ -113,7 +113,7 @@ local function parseString52(s)
     last = to+1
     i = i + 1
   end
-  t[i] = string.sub(str, last, #str)
+  t[i] = string.sub(str, last)
 
   -- parse results
   local nt = {}
