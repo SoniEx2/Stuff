@@ -36,12 +36,44 @@ setmetatable(pads, {
     end
   })
 
+local findpairs
+do
+  local function _findnext_util(a, b, ...)
+    return b, coroutine.yield(a, b, ...)
+  end
+  local function _findnext(stringandpattern, index)
+    while true do
+      index = _findnext_util(string.find(stringandpattern[1], stringandpattern[2], index + 1))
+    end
+  end
+  function findpairs(string, pattern)
+    return coroutine.wrap(_findnext), {string, pattern}, 0
+  end
+  --[[
+  -- alternate (stateless) findpairs (untested)
+  local function _findnext(stringandpattern, index)
+    -- only branch if index = 0
+    if index > 0 then
+      -- this should always give a match,
+      -- as we're starting from the same index as the returned match
+      local x,y = string.find(stringandpattern[1], stringandpattern[2], index)
+      return string.find(stringandpatter[1], stringandpattern[2], y+1)
+    else
+      return string.find(stringandpattern[1], stringandpattern[2], index + 1)
+    end
+  end
+  function findpairs(string, pattern)
+    return _findnext, {string, pattern}, 0
+  end
+  ]]
+end
+
 -- Parse a string like it's a Lua 5.2 string.
 local function parseString52(s)
   -- "validate" string
   local startChar = string.sub(s,1,1)
-  assert(startChar==squote or startChar==dquote)
-  assert(string.sub(s, -1, -1) == startChar)
+  assert(startChar==squote or startChar==dquote, "not a string")
+  assert(string.sub(s, -1, -1) == startChar, "unfinished string")
 
   -- remove quotes
   local str = string.sub(s, 2, -2)
@@ -76,7 +108,7 @@ local function parseString52(s)
   local i = 1
   local last = 1
   -- split on \z
-  for from,to in function(x,y) return string.find(x, "\\z", y+1) end, str, 0 do
+  for from, to in findpairs(str, "\\z") do
     t[i] = string.sub(str, last, from - 1)
     last = to+1
     i = i + 1
@@ -135,4 +167,5 @@ end
 
 return {
   parse52 = parseString52,
+  findpairs = findpairs,
 }
