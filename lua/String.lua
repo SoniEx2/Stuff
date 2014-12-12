@@ -53,7 +53,7 @@ local function parseString52(s)
       -- swap startChar with some invalid escape
       if c == startChar then
         c = "m"
-      -- swap the invalid escape with startChar
+        -- swap the invalid escape with startChar
       elseif c == "m" then
         c = startChar
       end
@@ -62,7 +62,7 @@ local function parseString52(s)
 
   -- check for a padded escape for startChar - remember this is actually our invalid escape
   assert(not string.find(str, "\\v" .. startChar .. "/"), "invalid escape sequence near '\\m'")
-  
+
   -- then check for non-escaped startChar
   assert(not string.find(str, startChar), "unfinished string")
 
@@ -72,25 +72,41 @@ local function parseString52(s)
   -- pad 2-digit numerical escapes
   str = string.gsub(str, "\\([0-9][0-9])[^0-9]", "\\0%1")
 
-  -- strip \z (and spaces)
-  str = string.gsub(str, "\\z[%s\n\r]+", "")
+  local t = {}
+  local i = 1
+  local last = 1
+  -- split on \z
+  for from,to in function(x,y) return string.find(x, "\\z", y+1) end, str, 0 do
+    t[i] = string.sub(str, last, from - 1)
+    last = to+1
+    i = i + 1
+  end
+  t[i] = string.sub(str, last, #str)
 
   -- parse results
-  str = string.gsub(str, "\\(([vx0-9])((.).))",
-    function(a,b,c,d)
-      if b == "v" then
-        return escapeSequences[d] or (d == "m" and startChar or assert(false, "invalid escape sequence near '\\" .. d .. "'"))
-      elseif b == "x" then
-        local n = tonumber(c, 16)
-        assert(n, "hexadecimal digit expected near '\\x" .. c .. "'")
-        return string.char(n)
-      else
-        local n = tonumber(a)
-        assert(n < 256, "decimal escape too large near '\\" .. a .. "'")
-        return string.char(n)
-      end
-    end)
-  return str
+  local nt = {}
+  for x,y in ipairs(t) do
+    nt[x] = string.gsub(y, "\\(([vx0-9])((.).))",
+      function(a,b,c,d)
+        if b == "v" then
+          return escapeSequences[d] or (d == "m" and startChar or assert(false, "invalid escape sequence near '\\" .. d .. "'"))
+        elseif b == "x" then
+          local n = tonumber(c, 16)
+          assert(n, "hexadecimal digit expected near '\\x" .. c .. "'")
+          return string.char(n)
+        else
+          local n = tonumber(a)
+          assert(n < 256, "decimal escape too large near '\\" .. a .. "'")
+          return string.char(n)
+        end
+      end)
+    if x > 1 then
+      -- handle \z
+      nt[x] = string.gsub(nt[x], "^[%s]*", "")
+    end
+  end
+  -- merge
+  return table.concat(nt, "")
 end
 
 -- "tests"
