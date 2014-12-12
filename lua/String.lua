@@ -38,6 +38,7 @@ setmetatable(pads, {
 
 local findpairs
 do
+  --[[
   local function _findnext_util(a, b, ...)
     return b, coroutine.yield(a, b, ...)
   end
@@ -49,7 +50,8 @@ do
   function findpairs(string, pattern)
     return coroutine.wrap(_findnext), {string, pattern}, 0
   end
-  --[[
+  --]]
+  -- [[
   -- alternate (stateless) findpairs (untested)
   local function _findnext(stringandpattern, index)
     -- only branch if index = 0
@@ -57,7 +59,7 @@ do
       -- this should always give a match,
       -- as we're starting from the same index as the returned match
       local x,y = string.find(stringandpattern[1], stringandpattern[2], index)
-      return string.find(stringandpatter[1], stringandpattern[2], y+1)
+      return string.find(stringandpattern[1], stringandpattern[2], y+1)
     else
       return string.find(stringandpattern[1], stringandpattern[2], index + 1)
     end
@@ -65,7 +67,7 @@ do
   function findpairs(string, pattern)
     return _findnext, {string, pattern}, 0
   end
-  ]]
+  --]]
 end
 
 -- Parse a string like it's a Lua 5.2 string.
@@ -144,14 +146,16 @@ end
 -- "tests"
 -- TODO add more
 -- also add automatic checks
+-- syntax error in Lua 5.0 :/ uncomment to enable
+--[[
 if _VERSION == "Lua 5.2" and not ... then
   local t = {
-    [["\""]],
-    [["""]],
-    [["v""]],
-    [[""/"]],
-    [["\v"/"]],
-    [["\m"]]
+    [=["\""]=],
+    [=["""]=],
+    [=["v""]=],
+    [=[""/"]=],
+    [=["\v"/"]=],
+    [=["\m"]=]
   }
   for _, str in ipairs(t) do
     local s, m = pcall(parseString52, str)
@@ -164,6 +168,7 @@ if _VERSION == "Lua 5.2" and not ... then
 elseif not ... then
   print("Tests require Lua 5.2")
 end
+--]]
 
 return {
   parse52 = parseString52,
