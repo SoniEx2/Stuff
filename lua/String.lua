@@ -165,6 +165,11 @@ if _VERSION == "Lua 5.2" and not ... then
     [=["\256"]=],
     [=["\xnn"]=],
     '"\\\n"',
+    --[[
+    -- TODO FIXME
+    [=["\x"]=], -- should error but is never seen
+    [=["\xn"]=], -- same as above
+    --]]
   }
   for _, str in ipairs(t) do
     local s, m = pcall(parseString52, str)
@@ -173,6 +178,8 @@ if _VERSION == "Lua 5.2" and not ... then
     s, m = load("return " .. str, "=[" .. str .. "]")
     io.write(tostring(s and ("[" .. s() .. "]")))
     io.write(tostring(m and "\t"..m or "") .. "\n")
+    -- TODO assert that printed status and printed error are
+    -- the same between parse52()/parseString52() vs load()
   end
   -- test line stuff
   local t2 = {
