@@ -1,5 +1,7 @@
+-- workarounds for IDE bugs
 local squote = "'"
 local dquote = '"'
+local backslash = "\\"
 
 local function chartopad(c)
   return string.format("\\%03d", string.byte(c))
@@ -27,9 +29,10 @@ local pads = {
   n = chartopad('\n'),
   t = chartopad('\t'),
   v = chartopad('\v'),
-  ['"'] = chartopad('\"'),
-  ["'"] = chartopad('\''),
-['\\'] = chartopad('\\')
+  [ dquote ] = chartopad(dquote),
+  [ squote ] = chartopad(squote),
+  [ backslash ] = chartopad(backslash),
+  ['\n'] = chartopad('\n')
 }
 
 local numbers = {
@@ -44,10 +47,6 @@ local numbers = {
   ['8'] = true,
   ['9'] = true
 }
-
-setmetatable(pads, {
-    __index = function(t,k) error("invalid escape sequence near '\\" .. k .. "'", 3) end
-  })
 
 local findpairs
 do
@@ -68,21 +67,35 @@ do
   end
 end
 
+local function getline(str, pos)
+  -- remove everything that's not a newline then count the newlines + 1
+  return #(string.gsub(string.sub(str, 1, pos - 1), "[^\n]", "")) + 1
+end
+
 -- Parse a string like it's a Lua 5.2 string.
 local function parseString52(s)
   -- "validate" string
   local startChar = string.sub(s,1,1)
-  assert(startChar==squote or startChar==dquote, "not a string")
-  assert(string.sub(s, -1, -1) == startChar, "unfinished string")
+  if startChar~=squote and startChar~=dquote then
+    error("not a string", 0)
+  end
+  if string.sub(s, -1, -1) ~= startChar then
+    error(("[%s]:%d: unfinished string"):format(s, getline(s, -1)), 0)
+  end
 
   -- remove quotes
   local str = string.sub(s, 2, -2)
 
   -- replace "normal" escapes with a padded escape
-  str = string.gsub(str, "\\(.)", pads)
+  str = string.gsub(str, "()\\(.)", function(idx,c)
+      return pads[c] or
+      error(("[%s]:%d: invalid escape sequence near '\\%s'"):format(s, getline(s, idx), c), 0)
+    end)
 
   -- check for non-escaped startChar
-  assert(not string.find(str, startChar), "unfinished string")
+  if string.find(str, startChar) then
+    error(("[%s]:%d: unfinished string"):format(s, getline(s, -1)), 0)
+  end
 
   -- pad numerical escapes
   str = string.gsub(str, "\\([0-9])(.?)(.?)", function(a, b, c)
@@ -97,8 +110,7 @@ local function parseString52(s)
           x, c = x .. c, ""
         end
       end
-      local temp1 = ("0"):rep(3 - #x)
-      return "\\" .. temp1 .. x .. b .. c
+      return backslash .. ("0"):rep(3 - #x) .. x .. b .. c
     end)
 
   local t = {}
@@ -116,16 +128,21 @@ local function parseString52(s)
   -- parse results
   local nt = {}
   for x,y in ipairs(t) do
-    nt[x] = string.gsub(y, "\\(([x0-9])((.).))",
-      function(a,b,c,d)
+    nt[x] = string.gsub(y, "()\\(([x0-9])((.).))",
+      function(idx,a,b,c,d)
         if b ~= "x" then
           local n = tonumber(a)
-          assert(n < 256, "decimal escape too large near '\\" .. a .. "'")
+          if n >= 256 then
+            error(("[%s]:%d: decimal escape too large near '\\%s'"):format(s,getline(s,idx),a), 0)
+          end
           return string.char(n)
         else
           local n = tonumber(c, 16)
-          assert(n, "hexadecimal digit expected near '\\x" .. c .. "'")
-          return string.char(n)
+          if n then
+            return string.char(n)
+          end
+          local o = d:find("[0-9a-fA-F]") and c or d
+          error(("[%s]:%d: hexadecimal digit expected near '\\x%s'"):format(s,getline(s,idx),o), 0)
         end
       end)
     if x > 1 then
@@ -141,22 +158,32 @@ end
 -- TODO add more
 -- also add automatic checks
 if _VERSION == "Lua 5.2" and not ... then
+  -- test string parsing
   local t = {
     [=["\""]=],
-    [=["""]=],
-    [=["v""]=],
-    [=[""/"]=],
-    [=["\v"/"]=],
-    [=["\m"]=],
     [=["\32"]=],
+    [=["\256"]=],
+    [=["\xnn"]=],
+    '"\\\n"',
   }
   for _, str in ipairs(t) do
     local s, m = pcall(parseString52, str)
-    io.write(tostring(s and m or "nil"))
+    io.write(tostring(s and ("[" .. m .. "]") or "nil"))
     io.write(tostring(s and "" or ("\t" .. m)) .. "\n")
-    s, m = load("return " .. str, "@/home/soniex2/git/github/Stuff/lua/String.lua:")
-    io.write(tostring(s and s()))
+    s, m = load("return " .. str, "=[" .. str .. "]")
+    io.write(tostring(s and ("[" .. s() .. "]")))
     io.write(tostring(m and "\t"..m or "") .. "\n")
+  end
+  -- test line stuff
+  local t2 = {
+    {"test\nother", 5, 1},
+    {"test\nother", 6, 2},
+    {"\n", 1, 1},
+    {"\n", 2, 2}, -- there is no char 2 but that's not the point
+  }
+  for _, temp in ipairs(t2) do
+    local got, expect = getline(temp[1], temp[2]), temp[3]
+    assert(got == expect, ("got %d, expected %d"):format(got, expect))
   end
 elseif not ... then
   print("Tests require Lua 5.2")
@@ -165,4 +192,5 @@ end
 return {
   parse52 = parseString52,
   findpairs = findpairs,
+  getline = getline,
 }
