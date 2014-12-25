@@ -128,6 +128,11 @@ local function parseString52(s)
   -- parse results
   local nt = {}
   for x,y in ipairs(t) do
+    -- fix "\x" and "\xn"
+    if y:sub(-3):match("\\x") then
+      -- append 2 startChars, this'll error anyway so it doesn't matter.
+      y = y .. startChar .. startChar
+    end
     nt[x] = string.gsub(y, "()\\(([x0-9])((.).))",
       function(idx,a,b,c,d)
         if b ~= "x" then
@@ -165,11 +170,8 @@ if _VERSION == "Lua 5.2" and not ... then
     [=["\256"]=],
     [=["\xnn"]=],
     '"\\\n"',
-    --[[
-    -- TODO FIXME
-    [=["\x"]=], -- should error but is never seen
-    [=["\xn"]=], -- same as above
-    --]]
+    [=["\x"]=],
+    [=["\xn"]=],
   }
   for _, str in ipairs(t) do
     local s, m = pcall(parseString52, str)
