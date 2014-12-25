@@ -129,7 +129,7 @@ local function parseString52(s)
   local nt = {}
   for x,y in ipairs(t) do
     -- fix "\x" and "\xn"
-    if y:sub(-3):match("\\x") then
+    if y:sub(-3):find("\\x", 1, true) then
       -- append 2 startChars, this'll error anyway so it doesn't matter.
       y = y .. startChar .. startChar
     end
@@ -172,6 +172,8 @@ if _VERSION == "Lua 5.2" and not ... then
     '"\\\n"',
     [=["\x"]=],
     [=["\xn"]=],
+    [=['\x']=],
+    [=['\x0']=],
   }
   for _, str in ipairs(t) do
     local s, m = pcall(parseString52, str)
