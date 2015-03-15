@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# USAGE: ./play <crunchyroll URL>
+
+# REQUIRES: bash, youtube-dl, mpv, POSIX-compliant OS (e.g. OSX, Linux, *BSD)
+
+# TODO: use printf instead of echo where '%q' format is required
+# TODO: config file
+# TODO: enable/disable debug mode
+# TODO: test on cygwin/POSIX emulators?
+
+ytdl() {
+  ( echo $BASHPID > $1 ; exec youtube-dl --quiet --all-subs --write-sub -o "$2" "$3" ) ; rm $1
+}
+
+if filename=$(youtube-dl --get-filename "$1")
+then
+  echo -e "\e[38;5;48mGot filename $filename\e[0m"
+  echo -e "\e[38;5;48mStarting youtube-dl with command youtube-dl --quiet --all-subs --write-sub -o $filename $1 > .ytdl_test\e[0m"
+  pidfile=.ytdl.pid.$BASHPID
+  ytdl "$pidfile" "$filename" "$1" &
+  pidofytdl="$!"
+  echo -e "\e[38;5;48mBASHPID: $BASHPID\e[0m"
+  echo -e "\e[38;5;48myoutube-dl PID: $pidofytdl\e[0m"
+  sleep 30
+  extensionless=${filename%.*}
+  for subfile in "$extensionless".*.ass
+  do
+    echo -e "\e[38;5;48mFound subfile $subfile\e[0m"
+    args+=("--sub-file=$subfile")
+  done
+  echo -e "\e[38;5;48mStarting mpv with command: mpv ${args[*]} $filename.part\e[0m"
+  mpv "${args[@]}" "$filename.part"
+  if [[ -s "$pidfile" ]] && read pid <"$pidfile"
+  then
+    kill $pid
+    wait $pid
+    echo -e "\e[38;5;48mkilled PID: $pid\e[0m"
+    rm "$pidfile"
+  fi
+fi
