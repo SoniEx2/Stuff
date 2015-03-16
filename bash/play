@@ -9,6 +9,9 @@
 # TODO: enable/disable debug mode
 # TODO: test on cygwin/POSIX emulators?
 
+# SPECIAL THANKS:
+# - kurahaupo @ freenode: for helping me learn how to do this
+
 ytdl() {
   ( echo $BASHPID > $1 ; exec youtube-dl --quiet --all-subs --write-sub -o "$2" "$3" ) ; rm $1
 }
