@@ -32,14 +32,16 @@ local function vm(word, idx, ...)
   end
 end
 
--- 2 DUP 3 * + .
--- w["."](w["+"](w["*"](3, w["DUP"](2))))
-local p = {
-  2,
+-- tests
+-- define "square"
+w["square"] = {
   w["DUP"],
-  3,
-  w["*"],
-  w["+"],
-  w["."]
+  w["*"]
 }
-vm(p, 1)
+local p = {
+  5,
+  w["square"],
+  -- it's on the stack
+  --w["."]
+}
+asssvm(p, 1)
