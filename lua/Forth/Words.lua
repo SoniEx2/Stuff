@@ -19,7 +19,46 @@ local function op2i1o(f)
   end
 end
 
-local bit = require"bit"
+local bit = select(2, pcall(require, "bit")) or {
+  tobit = function(i) -- half-assed bit.tobit
+    i = math.fmod(i, 2^32) --> math.fmod(-, +) = -
+    if i < 0 then
+      i = i + 2^32
+    end
+    i = math.floor(i)
+    i = i % 2^32 -- low 32 bits
+    local ioff = i % 2^31 -- low 31 bits (offset)
+    return ioff - i + ioff
+  end,
+  bor = function(...)
+    local n = select('#', ...)
+    local args = {...}
+    local out = {}
+    local i = 0
+    local j = 1
+    local k = 0
+    while true do
+      i = i + 1
+      local v = args[i]
+      v = tobit(v)
+      local d = math.floor(v / 2)
+      out[j] = math.max(out[j] or 0, (v - d * 2))
+      args[i] = d
+      if d == 0 then k = k + 1 end
+      i = i % n
+      if i == 0 then
+        j = j + 1
+        if k == n then break end
+        k = 0
+      end
+    end
+    local v = 0
+    for i=#out, 1, -1 do
+      v = v * 2 + out[i]
+    end
+    return v
+  end
+}
 local vm = require"VM"
 
 local function signed(i)
@@ -132,7 +171,7 @@ do
   cw["R@"] = rfetch
 
   -- 2 variants
-  
+
   -- push return stack
   local function twotor(word, i, ...)
     uf(2, ...)
@@ -146,7 +185,7 @@ do
     )
   end
   cw["2>R"] = twotor
-  
+
   -- pop return stack
   local tworfromsentinel = {}
   local tworfromswapsentinel = {}
@@ -156,7 +195,7 @@ do
     -- then we do the next pop with a sentinel telling us to do the swap
     -- then we do the swap
     -- YES IT'S VERY PAINFUL
-    
+
     if swap(...) == tworfromsentinel then
       -- next pop with sentinel for swap
       return word, 0, i - 1, tworfromswapsentinel, select(2, swap(...))
@@ -168,7 +207,7 @@ do
     return word, 0, i - 1, tworfromsentinel, ...
   end
   cw["2R>"] = tworfrom
-  
+
   -- fetch return stack (EVEN MORE PAINFUL)
   local function tworfetch(word, i, ...)
     if swap(...) == tworfromsentinel then

@@ -159,6 +159,95 @@ local function parseString52(s)
   return table.concat(nt, "")
 end
 
+-- Parse a string like it's a Lua 5.3 string.
+local function parseString53(s)
+  -- "validate" string
+  local startChar = string.sub(s,1,1)
+  if startChar~=squote and startChar~=dquote then
+    error("not a string", 0)
+  end
+  if string.sub(s, -1, -1) ~= startChar then
+    error(("[%s]:%d: unfinished string"):format(s, getline(s, -1)), 0)
+  end
+
+  -- remove quotes
+  local str = string.sub(s, 2, -2)
+
+  -- replace "normal" escapes with a padded escape
+  str = string.gsub(str, "()\\(.)", function(idx,c)
+      return pads[c] or
+      error(("[%s]:%d: invalid escape sequence near '\\%s'"):format(s, getline(s, idx), c), 0)
+    end)
+
+  -- check for non-escaped startChar
+  if string.find(str, startChar) then
+    error(("[%s]:%d: unfinished string"):format(s, getline(s, -1)), 0)
+  end
+
+  -- TODO Unicode handling
+
+  -- pad numerical escapes
+  str = string.gsub(str, "\\([0-9])(.?)(.?)", function(a, b, c)
+      local x = a
+      -- swap b and c if #b == 0; this is to avoid UB:
+      -- _in theory_ `c` could match but not `b`, this solves
+      -- that problem. uncomment if you know what you're doing.
+      if #b == 0 then b, c = c, b end
+      if numbers[b] then
+        x, b = x .. b, ""
+        if numbers[c] then
+          x, c = x .. c, ""
+        end
+      end
+      return backslash .. ("0"):rep(3 - #x) .. x .. b .. c
+    end)
+
+  local t = {}
+  local i = 1
+  local last = 1
+  -- split on \z
+  -- we can look for "\z" directly because we already escaped everything else
+  for from, to in findpairs(str, "\\z", true) do
+    t[i] = string.sub(str, last, from - 1)
+    last = to+1
+    i = i + 1
+  end
+  t[i] = string.sub(str, last)
+
+  -- parse results
+  local nt = {}
+  for x,y in ipairs(t) do
+    -- fix "\x" and "\xn"
+    if y:sub(-3):find("\\x", 1, true) then
+      -- append 2 startChars, this'll error anyway so it doesn't matter.
+      y = y .. startChar .. startChar
+    end
+    nt[x] = string.gsub(y, "()\\(([x0-9])((.).))",
+      function(idx,a,b,c,d)
+        if b ~= "x" then
+          local n = tonumber(a)
+          if n >= 256 then
+            error(("[%s]:%d: decimal escape too large near '\\%s'"):format(s,getline(s,idx),a), 0)
+          end
+          return string.char(n)
+        else
+          local n = tonumber(c, 16)
+          if n then
+            return string.char(n)
+          end
+          local o = d:find("[0-9a-fA-F]") and c or d
+          error(("[%s]:%d: hexadecimal digit expected near '\\x%s'"):format(s,getline(s,idx),o), 0)
+        end
+      end)
+    if x > 1 then
+      -- handle \z
+      nt[x] = string.gsub(nt[x], "^[%s]*", "")
+    end
+  end
+  -- merge
+  return table.concat(nt, "")
+end
+
 -- "tests"
 -- TODO add more
 -- also add automatic checks
