@@ -3,7 +3,7 @@
 local rawget, getmetatable, type, ipairs, error, pcall, setmetatable, pairs = rawget, getmetatable, type, ipairs, error, pcall, setmetatable, pairs
 local crunning = coroutine.running
 
-local threadset = setmetatable({}, {__mode="v"})
+local threadset = setmetatable({}, {__mode="k"})
 local original = {}
 
 -- no metatable
