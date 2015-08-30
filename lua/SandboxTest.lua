@@ -14,7 +14,7 @@ for k,v in pairs(getmetatable"") do
 end
 sb.setLocalMetatable(co, "", copy)
 coroutine.resume(co)
-assert(not pcall(function() print("a"+"b") end)) -- should print "false"
+assert(not pcall(function() print("a"+"b") end))
 
 assert(copy.__add)
 
