@@ -412,8 +412,8 @@ def parse(ircstring):
 qc_msg_mask = compile_colors(r"^<(%C01\[[^\]]+\%C01\])(.+?)%O> (.*)")
 qc_action_mask = compile_colors(r"^%C06\* (%C01\[[^\]]+%C01\])([^ ]+)%C06 (.*)")
 
-qc_connect_mask = compile_colors(r"^\[([^ ]+) connected\]$")
-qc_disconnect_mask = compile_colors(r"^\[([^ ]+) disconnected\]$")
+qc_connect_mask = compile_colors(r"^\[([^ ]+) joined the game\]$")
+qc_disconnect_mask = compile_colors(r"^\[([^ ]+) left the game\]$")
 
 qc_player_host = hexchat_parse(r"player@mc.queercraft.net")
 
