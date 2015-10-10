@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "3.0.0"
+__module_version__ = "4.0.0"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
