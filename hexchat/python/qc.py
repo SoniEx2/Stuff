@@ -274,6 +274,8 @@ class Formatting(object):
     def __add__(self, other):
         if not isinstance(self, Formatting) or not isinstance(other, Formatting):
             raise NotImplemented
+        if other == Formatting.RESET:
+            return Formatting.RESET
         return Formatting(
             self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.foreground,
             self.background if other.background == Formatting.COLORS.NO_CHANGE else other.background,
@@ -291,6 +293,8 @@ class Formatting(object):
     def __sub__(self, other):
         if not isinstance(self, Formatting) or not isinstance(other, Formatting):
             raise NotImplemented
+        if other == Formatting.RESET:
+            return Formatting.RESET
         return Formatting(
             self.foreground if other.foreground == Formatting.COLORS.NO_CHANGE else other.foreground,
             self.background if other.background == Formatting.COLORS.NO_CHANGE else other.background,
@@ -350,12 +354,14 @@ formattings = {
     }
 
 
-def parse(ircstring):
+def parse(ircstring, resultingformat=False, apply_on=None):
     """Parse attributes/formatting on an IRC string.
 
     The passed string MUST use mIRC attribute codes, NOT HexChat's %x attrubute codes.
     If you have a string with HexChat's attribute codes, pass it through hexchat_parse(s) first."""
     l = []
+    if apply_on is not None:
+        l.append(apply_on)
     last = 0
     for matchobj in parse_mask.finditer(ircstring):
         if matchobj.string[last:matchobj.start()]:
@@ -397,6 +403,12 @@ def parse(ircstring):
         last = matchobj.end()
     if ircstring[last:]:
         l.append(ircstring[last:])
+    if resultingformat:
+        result = Formatting.NO_CHANGE
+        for obj in l:
+            if isinstance(obj, Formatting):
+                result = result + obj
+        return result
     return l
 
 
@@ -416,6 +428,8 @@ qc_connect_mask = compile_colors(r"^\[([^ ]+) joined the game\]$")
 qc_disconnect_mask = compile_colors(r"^\[([^ ]+) left the game\]$")
 
 qc_player_host = hexchat_parse(r"player@mc.queercraft.net")
+
+hexchat_event_param = re.compile(r"\$.")
 
 
 def is_qc(ctx):
@@ -439,13 +453,13 @@ def qcbot_msg(word, word_eol, userdata, attributes):
             if _badge:
                 # to see this, see http://tinyurl.com/hexchatbadge
                 if "Mod" in badge:
-                    badge = "%B%C07&%O"
+                    badge = "%B%C07&%C%B"
                 elif "Op" in badge:  # or "SrOp" in badge:  # redundant :P
-                    badge = "%B%C04@%O"
+                    badge = "%B%C04@%C%B"
                 elif "Owner" in badge or "Admin" in badge:
-                    badge = "%B%C02~%O"
+                    badge = "%B%C02~%C%B"
                 elif "Newbie" in badge:
-                    badge = "%B%C06?%O"
+                    badge = "%B%C06?%C%B"
                 else:  # for members
                     badge = ""
                 badge = hexchat_parse(badge)
@@ -455,8 +469,28 @@ def qcbot_msg(word, word_eol, userdata, attributes):
                 badge = hexchat.strip(badge)
                 nick = hexchat.strip(nick)
             else:
-                #evt = hexchat_parse(hexchat.get_info("event_text {}".format(userdata[0])))
-                pass
+                # TODO cache
+                evt = hexchat_parse(hexchat.get_info("event_text {}".format(userdata[0])))
+                format = Formatting.RESET
+                pevt = parse(evt)
+                for pos, obj in enumerate(pevt):
+                    if isinstance(obj, str):
+                        for event_param in hexchat_event_param.finditer(obj):
+                            tag = event_param.group()[1]
+                            if tag == "1":
+                                targetfmt = parse(nick, True, format)-format
+                                fmtstr = str(targetfmt)
+                                nick = nick + fmtstr
+                            elif tag == "2":
+                                targetfmt = parse(text, True, format)-format
+                                fmtstr = str(targetfmt)
+                                text = text + fmtstr
+                            elif tag == "3":
+                                targetfmt = parse(badge, True, format)-format
+                                fmtstr = str(targetfmt)
+                                badge = badge + fmtstr
+                    else:
+                        format = format + obj
 
             if attributes.time:
                 ctx.emit_print(userdata[0], compress_colors(nick), text, badge, time=attributes.time)
@@ -472,8 +506,25 @@ def qcbot_connect(word, word_eol, userdata, attributes):
         match = qc_connect_mask.match(word[1])
         if match:
             nick = match.group(1)
+
             if not _cols:
                 nick = hexchat.strip(nick)
+            else:
+                # TODO cache
+                evt = hexchat_parse(hexchat.get_info("event_text Join"))
+                format = Formatting.RESET
+                pevt = parse(evt)
+                for pos, obj in enumerate(pevt):
+                    if isinstance(obj, str):
+                        for event_param in hexchat_event_param.finditer(obj):
+                            tag = event_param.group()[1]
+                            if tag == "1":
+                                targetfmt = parse(nick, True, format)-format
+                                fmtstr = str(targetfmt)
+                                nick = nick + fmtstr
+                    else:
+                        format = format + obj
+
             if attributes.time:
                 ctx.emit_print("Join", compress_colors(nick), ctx.get_info("channel"), qc_player_host,
                     time=attributes.time)
@@ -491,6 +542,22 @@ def qcbot_disconnect(word, word_eol, userdata, attributes):
             nick = match.group(1)
             if not _cols:
                 nick = hexchat.strip(nick)
+            else:
+                # TODO cache
+                evt = hexchat_parse(hexchat.get_info("event_text Part"))
+                format = Formatting.RESET
+                pevt = parse(evt)
+                for pos, obj in enumerate(pevt):
+                    if isinstance(obj, str):
+                        for event_param in hexchat_event_param.finditer(obj):
+                            tag = event_param.group()[1]
+                            if tag == "1":
+                                targetfmt = parse(nick, True, format)-format
+                                fmtstr = str(targetfmt)
+                                nick = nick + fmtstr
+                    else:
+                        format = format + obj
+
             if attributes.time:
                 ctx.emit_print("Part", compress_colors(nick), qc_player_host, ctx.get_info("channel"),
                     time=attributes.time)
