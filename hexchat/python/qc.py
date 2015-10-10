@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "4.0.0"
+__module_version__ = "4.1.0"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
@@ -427,18 +427,26 @@ qc_action_mask = compile_colors(r"^%C06\* (%C01\[[^\]]+%C01\])([^ ]+)%C06 (.*)")
 qc_connect_mask = compile_colors(r"^\[([^ ]+) joined the game\]$")
 qc_disconnect_mask = compile_colors(r"^\[([^ ]+) left the game\]$")
 
-qc_player_host = hexchat_parse(r"player@mc.queercraft.net")
+qc_kick_mask = compile_colors(r"^\[([^ ]+) was KICKED \((.*)\)]$")
 
 hexchat_event_param = re.compile(r"\$.")
 
+qc_channel = "#queercraft"
+
+qc_name = "QCChat"
+
+qc_host = "mc.queercraft.net" # not checked, for reasons
+
+qc_player_host = "player@" + qc_host
+
 
 def is_qc(ctx):
-    return ctx.get_info("channel").lower() == "#queercraft"
+    return ctx.get_info("channel").lower() == qc_channel
 
 
 def is_qcbot(ctx, word):
     return (len(word) > 2 and
-    hexchat.strip(word[0]) == "QCChat" and
+    hexchat.strip(word[0]) == qc_name and
     word[2] == "+" and
     is_qc(ctx))
 
@@ -566,6 +574,42 @@ def qcbot_disconnect(word, word_eol, userdata, attributes):
             return hexchat.EAT_ALL
     return hexchat.EAT_NONE
 
+def qcbot_kick(word, word_eol, userdata, attributes):
+    ctx = hexchat.get_context()
+    if is_qcbot(ctx, word):
+        match = qc_kick_mask.match(word[1])
+        if match:
+            nick, reason = match.groups()
+            if not _cols:
+                nick = hexchat.strip(nick)
+            else:
+                # TODO cache
+                evt = hexchat_parse(hexchat.get_info("event_text Kick"))
+                format = Formatting.RESET
+                pevt = parse(evt)
+                for pos, obj in enumerate(pevt):
+                    if isinstance(obj, str):
+                        for event_param in hexchat_event_param.finditer(obj):
+                            tag = event_param.group()[1]
+                            if tag == "2":
+                                targetfmt = parse(nick, True, format)-format
+                                fmtstr = str(targetfmt)
+                                nick = nick + fmtstr
+                            if tag == "3":
+                                targetfmt = parse(reason, True, format)-format
+                                fmtstr = str(targetfmt)
+                                reason = reason + fmtstr
+                    else:
+                        format = format + obj
+
+            if attributes.time:
+                ctx.emit_print("Kick", qc_host, compress_colors(nick), ctx.get_info("channel"), reason,
+                    time=attributes.time)
+            else:
+                ctx.emit_print("Kick", qc_host, compress_colors(nick), ctx.get_info("channel"), reason)
+            return hexchat.EAT_ALL
+    return hexchat.EAT_NONE
+
 # Message/action hooks
 hexchat.hook_print_attrs("Channel Message", qcbot_msg, userdata=["Channel Message", qc_msg_mask])
 hexchat.hook_print_attrs("Channel Msg Hilight", qcbot_msg, userdata=["Channel Msg Hilight", qc_msg_mask])
@@ -577,6 +621,10 @@ hexchat.hook_print_attrs("Channel Message", qcbot_connect)
 hexchat.hook_print_attrs("Channel Msg Hilight", qcbot_connect)
 hexchat.hook_print_attrs("Channel Message", qcbot_disconnect)
 hexchat.hook_print_attrs("Channel Msg Hilight", qcbot_disconnect)
+
+# kick
+hexchat.hook_print_attrs("Channel Message", qcbot_kick)
+hexchat.hook_print_attrs("Channel Msg Hilight", qcbot_kick)
 
 
 def unload(userdata):
