@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 __module_name__ = "Queercraft"
-__module_version__ = "4.1.0"
+__module_version__ = "4.1.1"
 __module_description__ = "QueercraftBOT thingy"
 __module_author__ = "SoniEx2"
 
@@ -582,6 +582,7 @@ def qcbot_kick(word, word_eol, userdata, attributes):
             nick, reason = match.groups()
             if not _cols:
                 nick = hexchat.strip(nick)
+                reason = hexchat.strip(reason)
             else:
                 # TODO cache
                 evt = hexchat_parse(hexchat.get_info("event_text Kick"))
@@ -595,7 +596,7 @@ def qcbot_kick(word, word_eol, userdata, attributes):
                                 targetfmt = parse(nick, True, format)-format
                                 fmtstr = str(targetfmt)
                                 nick = nick + fmtstr
-                            if tag == "3":
+                            if tag == "4":
                                 targetfmt = parse(reason, True, format)-format
                                 fmtstr = str(targetfmt)
                                 reason = reason + fmtstr
