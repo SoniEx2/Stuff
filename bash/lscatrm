@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# NAME
+#        lscatrm - ls + cat + rm
+#
+# SYNOPSIS
+#        lscatrm [file or folder...]
+#        lscatrm -r <file or folder...>
+#
+# DESCRIPTION
+#        lscatrm is a combination of ls, cat and rm so you use the same command to do all 3 tasks.
+#        It is a helper designed for cleaning up files and directories in your system, allowing you
+#        to list (ls), analyze (cat) and then remove (rm) files and directories.
+#
+#        Options (including -r) may appear anywhere in the arguments. -- stops processing options.
+
+declare -a dirs
+declare -a files
+
+parseargs=1
+remove=0
+len=0
+for path; do
+  pos="$((${#dirs}+${#files}))"
+  if [ $parseargs -eq 1 ] && [ "$path" = "-r" ]; then
+    remove=1
+  elif [ $parseargs -eq 1 ] && [ "$path" = "--" ]; then
+    parseargs=0
+  else
+    if [ -d "$path" ]; then
+      dirs[len]="$path"
+    else
+      files[len]="$path"
+    fi
+    len=$((len+1))
+  fi
+done
+
+if [ $remove -eq 1 ]; then
+  pos=0
+  until [ $pos -eq $len ]; do
+    if [ -v dirs[pos] ]; then
+      rm -r -- "${dirs[pos]}"
+    fi
+    if [ -v files[pos] ]; then
+      rm -- "${files[pos]}"
+    fi
+    pos=$((pos+1))
+  done
+
+  if [ $len -eq 0 ]; then
+    printf >&2 "lscatrm -r requires files to remove\n"
+    exit 1
+  fi
+else
+  pos=0
+  until [ $pos -eq $len ]; do
+    if [ -v dirs[pos] ]; then
+      ls -F -- "${dirs[pos]}"
+    fi
+    if [ -v files[pos] ]; then
+      cat -- "${files[pos]}"
+    fi
+    pos=$((pos+1))
+  done
+
+  if [ $len -eq 0 ]; then
+    ls -F
+  fi
+fi
