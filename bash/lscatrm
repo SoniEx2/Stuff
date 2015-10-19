@@ -32,20 +32,20 @@ for path; do
     else
       files[len]="$path"
     fi
-    len=$((len+1))
+    ((len++))
   fi
 done
 
 if [ $remove -eq 1 ]; then
   pos=0
   until [ $pos -eq $len ]; do
-    if [ -v dirs[pos] ]; then
+    if [ -v "dirs[pos]" ]; then
       rm -r -- "${dirs[pos]}"
     fi
-    if [ -v files[pos] ]; then
+    if [ -v "files[pos]" ]; then
       rm -- "${files[pos]}"
     fi
-    pos=$((pos+1))
+    ((pos++))
   done
 
   if [ $len -eq 0 ]; then
@@ -55,13 +55,13 @@ if [ $remove -eq 1 ]; then
 else
   pos=0
   until [ $pos -eq $len ]; do
-    if [ -v dirs[pos] ]; then
+    if [ -v "dirs[pos]" ]; then
       ls -F -- "${dirs[pos]}"
     fi
-    if [ -v files[pos] ]; then
+    if [ -v "files[pos]" ]; then
       cat -- "${files[pos]}"
     fi
-    pos=$((pos+1))
+    ((pos++))
   done
 
   if [ $len -eq 0 ]; then
