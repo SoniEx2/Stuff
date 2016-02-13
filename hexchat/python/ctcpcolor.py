@@ -9,8 +9,12 @@ import re
 ctcp = re.compile("\x01(.*?)\x01")
 
 def replacement(match):
-  if len(match.group(1)) > 2 and match.group(1)[0:2] == "F ":
-    parse = match.group(1)[2:]
+  g1 = match.group(1)
+  if (len(g1) > 2 and g1[0:2] == "F ") or (len(g1) > 7 and g1[0:7] == "FORMAT "):
+    if g1[0:2] == "F ":
+      parse = g1[2:]
+    else:
+      parse = g1[7:]
     parsed = []
     parseiter = iter(parse)
     enumerated = enumerate(parseiter)
