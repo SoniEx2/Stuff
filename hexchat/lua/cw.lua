@@ -25,7 +25,7 @@
 
 --]]
 local hexchat = hexchat
-hexchat.register("CTCP-S CW", "2.0.1", "CTCP-S CW for HexChat.")
+hexchat.register("CTCP-S CW", "2.0.2", "CTCP-S CW for HexChat.")
 
 package.preload.rc4 = function(...)
 --[[
@@ -871,7 +871,7 @@ do
       end
     end,
     "Channel Message", 2,
-    "Channel Msg Highlight", 2,
+    "Channel Msg Hilight", 2,
     "Channel Notice", 3,
     "Private Message", 2,
     "Private Message to Dialog", 2,
