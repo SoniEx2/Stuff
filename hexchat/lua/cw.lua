@@ -745,10 +745,12 @@ local shuffle = function(t, from, len, key)
   return t3
 end
 
+local utf8pattern = (_VERSION == "Lua 5.1" and "[%z" or "[\0") .. "\1-\x7F\xC2-\xF4][\x80-\xBF]*"
+
 local function strtot(str)
   local t = {}
   local ac = 0
-  str:gsub("[\0-\x7F\xC2-\xF4][\x80-\xBF]*", function(c) ac = ac + 1 t[ac] = c end)
+  str:gsub(utf8pattern, function(c) ac = ac + 1 t[ac] = c end)
   return t, ac
 end
 
