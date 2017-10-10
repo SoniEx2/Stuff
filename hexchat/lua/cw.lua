@@ -25,7 +25,7 @@
 
 --]]
 local hexchat = hexchat
-hexchat.register("CTCP-S CW", "2.1.0", "CTCP-S CW for HexChat.")
+hexchat.register("CTCP-S CW", "2.1.1", "CTCP-S CW for HexChat.")
 
 package.preload.rc4 = function(...)
 --[[
@@ -756,16 +756,20 @@ end
 
 local function cmd_cw(word, word_eol)
   (function()
-      if not word[3] then
+      if not word_eol[2]:match("^[^ ]+ .+$", 2) then
         hexchat.print("Usage: /cw <reason> <content>")
         return
       end
-      local cw, msg = word[2], word_eol[3]
+      local cw, msg = word_eol[2]:match("^([^ ]+) (.+)$")
       if cw:sub(1,1) == "'" or cw:sub(1,1) == '"' then
         local m, pos
         repeat
-          m, pos = string.match(word_eol[2], "(\\*)"..cw:sub(1,1).."()", 2)
-        until #m % 2 == 0
+          m, pos = string.match(word_eol[2], "(\\*)"..cw:sub(1,1).."()", pos or 2)
+        until m == nil or #m % 2 == 0
+        if m == nil then
+          hexchat.print("Unfinished string")
+          return
+        end
         local ok
         ok, cw = pcall(stringliteral.parse53, word_eol[2]:sub(1, pos-1))
         if not ok then
