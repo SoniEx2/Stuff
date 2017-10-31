@@ -297,310 +297,291 @@ package.preload.arc4random = function(...)
 end
 
 package.preload.stringliteral = function(...)
--- workarounds for IDE bugs
-  local squote = "'"
-  local dquote = '"'
-  local backslash = "\\"
+-- Faster? String.lua
 
-  local function chartopad(c)
-    return string.format("\\%03d", string.byte(c))
+  local error = error
+  local tonumber = tonumber
+  local sfind = string.find
+  local ssub = string.sub
+  local schar = string.char
+  local sbyte = string.byte
+  local mfloor = math.floor
+
+  local simpleEscapes = {}
+  for i = 1, 255 do
+    simpleEscapes[i] = false
+  end
+  for k,v in pairs({
+      a = '\a',
+      b = '\b',
+      f = '\f',
+      r = '\r',
+      n = '\n',
+      t = '\t',
+      v = '\v',
+      ['"'] = '"',
+      ["'"] = "'",
+      ['\\'] = '\\',
+      }) do
+    simpleEscapes[sbyte(k)] = v
   end
 
-  local pads = {
-    z = "\\z",
-    x = "\\x",
-    ['0'] = '\\0',
-    ['1'] = '\\1',
-    ['2'] = '\\2',
-    ['3'] = '\\3',
-    ['4'] = '\\4',
-    ['5'] = '\\5',
-    ['6'] = '\\6',
-    ['7'] = '\\7',
-    ['8'] = '\\8',
-    ['9'] = '\\9',
-
-    -- remap escape sequences
-    a = chartopad('\a'),
-    b = chartopad('\b'),
-    f = chartopad('\f'),
-    r = chartopad('\r'),
-    n = chartopad('\n'),
-    t = chartopad('\t'),
-    v = chartopad('\v'),
-    [ dquote ] = chartopad(dquote),
-    [ squote ] = chartopad(squote),
-    [ backslash ] = chartopad(backslash),
-    ['\n'] = chartopad('\n')
-  }
-
-  local pads53 = {}
-  for k,v in pairs(pads) do pads53[k] = v end
-  pads53.u = "\\u"
-
-  local numbers = {
-    ['0'] = true,
-    ['1'] = true,
-    ['2'] = true,
-    ['3'] = true,
-    ['4'] = true,
-    ['5'] = true,
-    ['6'] = true,
-    ['7'] = true,
-    ['8'] = true,
-    ['9'] = true
-  }
-
-  local findpairs
-  do
-    local function _findnext(flags, index)
-      -- only branch if index = 0
-      if index > 0 then
-        -- this should always give a match,
-        -- as we're starting from the same index as the returned match
-        -- TODO: test %f >.>
-        local x,y = string.find(flags[1], flags[2], index, flags[3])
-        return string.find(flags[1], flags[2], y+1, flags[3])
+  local function parse52(s)
+    local startChar = ssub(s,1,1)
+    if startChar~="'" and startChar~='"' then
+      error("not a string", 0)
+    end
+    local c = 0
+    local ln = 1
+    local t = {}
+    local nj = 1
+    local eos = #s
+    local pat = "^([^\\" .. startChar .. "\r\n]*)([\\" .. startChar .. "\r\n])"
+    local mkerr = function(emsg, ...)
+      error(string.format('[%s]:%d: ' .. emsg, s, ln, ...), 0)
+    end
+    local lnj
+    repeat
+      lnj = nj
+      local i, j, part, k = sfind(s, pat, nj + 1, false)
+      if i then
+        c = c + 1
+        t[c] = part
+        if k == "\\" then
+          nj = j + 1
+          local v = ssub(s, nj, nj)
+          local simple = simpleEscapes[sbyte(v)]
+          if simple then
+            c = c + 1
+            t[c] = simple
+          elseif v == "\r" or v == "\n" then
+            ln = ln + 1
+            local v1 = ssub(s, nj + 1, nj + 1)
+            if (v1 == "\r" or v1 == "\n") and v ~= v1 then
+              nj = nj + 1
+            end
+            c = c + 1
+            t[c] = '\n'
+          elseif v == "x" then
+            v = ssub(s, nj, nj+2)
+            if tonumber(ssub(v, 2), 16) then
+              nj = nj + 2
+              c = c + 1
+              t[c] = schar(tonumber(ssub(v, 2), 16))
+            else
+              mkerr("hexadecimal digit expected near '\\" .. v:match('x[0-9a-f]*.') .. "'")
+            end
+          elseif v == "z" then
+            local eaten, np = s:match("^([\t\n\v\f\r ]*)()", nj+1)
+            local p=np
+            nj = p-1
+            local skip = false
+            local mode = 0
+            local prev
+            for at, crlf in eaten:gmatch('()([\r\n])') do
+              local last = ssub(eaten, at-1, at-1)
+              if skip and prev == last and last ~= crlf then
+                skip = false
+              else
+                skip = true
+                ln = ln + 1
+              end
+              prev = crlf
+            end
+          elseif tonumber(v, 10) then
+            if tonumber(ssub(s, nj + 1, nj + 1)) then
+              if tonumber(ssub(s, nj + 2, nj + 2)) then
+                -- \000
+                local b = tonumber(ssub(s, nj, nj+2), 10)
+                if b > 255 then
+                  mkerr("decimal escape too large near '\\%s'", ssub(s, nj, nj+2))
+                else
+                  c = c + 1
+                  t[c] = schar(b)
+                  nj = nj + 2
+                end
+              else
+                -- \00
+                c = c + 1
+                t[c] = schar(tonumber(ssub(s, nj, nj+1), 10))
+                nj = nj + 1
+              end
+            else
+              -- \0
+              c = c + 1
+              t[c] = schar(tonumber(v, 10))
+            end
+          else
+            mkerr("invalid escape sequence near '\\%s'", v)
+          end
+        elseif k == startChar then
+          if eos-1 > j then
+            mkerr("<eof> expected")
+          end
+          nj = nil
+        elseif k == '\n' or k == '\r' then
+          mkerr("unfinished string near '%s'", startChar .. table.concat(t))
+          nj = nil
+        end
       else
-        return string.find(flags[1], flags[2], index + 1, flags[3])
+        nj = nil
       end
+    until not nj
+    if ssub(s, -1, -1) ~= startChar then
+      mkerr("unfinished string near <eof>")
     end
-    function findpairs(str, pat, raw)
-      return _findnext, {str, pat, raw}, 0
-    end
+    return table.concat(t)
   end
 
-  local function getline(str, pos)
-    -- remove everything that's not a newline then count the newlines + 1
-    return #(string.gsub(string.sub(str, 1, math.max(pos - 1, 0)), "[^\n]", "")) + 1
-  end
-
--- Parse a string like it's a Lua 5.2 string.
-  local function parseString52(s)
-    -- "validate" string
-    local startChar = string.sub(s,1,1)
-    if startChar~=squote and startChar~=dquote then
+  local function parse53(s)
+    local startChar = ssub(s,1,1)
+    if startChar~="'" and startChar~='"' then
       error("not a string", 0)
     end
-    if string.sub(s, -1, -1) ~= startChar then
-      error(("[%s]:%d: unfinished string"):format(s, getline(s, -1)), 0)
-    end
-
-    -- remove quotes
-    local str = string.sub(s, 2, -2)
-
-    -- replace "normal" escapes with a padded escape
-    str = string.gsub(str, "()\\(.)", function(idx,c)
-        return pads[c] or
-        error(("[%s]:%d: invalid escape sequence near '\\%s'"):format(s, getline(s, idx), c), 0)
-      end)
-
-    -- check for non-escaped startChar
-    do
-      local idx = string.find(str, "[" .. startChar .. "\n]")
-      if idx then
-        error(("[%s]:%d: unfinished string"):format(s, getline(s, idx - 1)), 0)
-      end
-    end
-
-    -- pad numerical escapes
-    str = string.gsub(str, "\\([0-9])(.?)(.?)", function(a, b, c)
-        local x = a
-        -- swap b and c if #b == 0; this is to avoid UB:
-        -- _in theory_ `c` could match but not `b`, this solves
-        -- that problem. uncomment if you know what you're doing.
-        if #b == 0 then b, c = c, b end
-        if numbers[b] then
-          x, b = x .. b, ""
-          if numbers[c] then
-            x, c = x .. c, ""
-          end
-        end
-        return backslash .. ("0"):rep(3 - #x) .. x .. b .. c
-      end)
-
+    local c = 0
+    local ln = 1
     local t = {}
-    local i = 1
-    local last = 1
-    -- split on \z
-    -- we can look for "\z" directly because we already escaped everything else
-    for from, to in findpairs(str, "\\z", true) do
-      t[i] = string.sub(str, last, from - 1)
-      last = to+1
-      i = i + 1
+    local nj = 1
+    local eos = #s
+    local pat = "^([^\\" .. startChar .. "\r\n]*)([\\" .. startChar .. "\r\n])"
+    local mkerr = function(emsg, ...)
+      error(string.format('[%s]:%d: ' .. emsg, s, ln, ...), 0)
     end
-    t[i] = string.sub(str, last)
-
-    -- parse results
-    local nt = {}
-    local bpos = 0 -- TODO fix newline handling
-    for x,y in ipairs(t) do
-      -- fix "\x" and "\xn"
-      if y:sub(-3):find("\\x", 1, true) then
-        -- append 2 startChars, this'll error anyway so it doesn't matter.
-        y = y .. startChar .. startChar
-      end
-      nt[x] = string.gsub(y, "()\\(([x0-9])((.).))",
-        function(idx,a,b,c,d)
-          if b ~= "x" then
-            local n = tonumber(a)
-            if n >= 256 then
-              error(("[%s]:%d: decimal escape too large near '\\%s'"):format(s,getline(s,bpos+idx),a), 0)
+    local lnj
+    repeat
+      lnj = nj
+      local i, j, part, k = sfind(s, pat, nj + 1, false)
+      if i then
+        c = c + 1
+        t[c] = part
+        if k == "\\" then
+          nj = j + 1
+          local v = ssub(s, nj, nj)
+          local simple = simpleEscapes[sbyte(v)]
+          if simple then
+            c = c + 1
+            t[c] = simple
+          elseif v == "\r" or v == "\n" then
+            ln = ln + 1
+            local v1 = ssub(s, nj + 1, nj + 1)
+            if (v1 == "\r" or v1 == "\n") and v ~= v1 then
+              nj = nj + 1
             end
-            return string.char(n)
+            c = c + 1
+            t[c] = '\n'
+          elseif v == "x" then
+            v = ssub(s, nj, nj+2)
+            if tonumber(ssub(v, 2), 16) then
+              nj = nj + 2
+              c = c + 1
+              t[c] = schar(tonumber(ssub(v, 2), 16))
+            else
+              mkerr("hexadecimal digit expected near '%s%s\\%s'", startChar, table.concat(t), v:match('x[0-9a-f]*.'))
+            end
+          elseif v == "z" then
+            local eaten, np = s:match("^([\t\n\v\f\r ]*)()", nj+1)
+            local p=np
+            nj = p-1
+            local skip = false
+            local mode = 0
+            local prev
+            for at, crlf in eaten:gmatch('()([\r\n])') do
+              local last = ssub(eaten, at-1, at-1)
+              if skip and prev == last and last ~= crlf then
+                skip = false
+              else
+                skip = true
+                ln = ln + 1
+              end
+              prev = crlf
+            end
+          elseif v == "u" then
+            if ssub(s, nj + 1, nj + 1) == '{' then
+              local uc = s:match("^[0-9a-fA-F]+", nj + 2)
+              if uc then
+                if ssub(s, nj + 2 + #uc, nj + 2 + #uc) == '}' then
+                  local uv = tonumber(uc, 16)
+                  if #uc > 6 or uv > 1114111 then
+                    mkerr("UTF-8 value too large near '%s%s\\%s'", startChar, table.concat(t), ssub(s, nj, nj + 1 + math.min(#uc, 6)))
+                  else
+                    nj = nj + 2 + #uc
+                    if uv < 128 then
+                      c = c + 1
+                      t[c] = schar(uv)
+                    elseif uv < 2048 then
+                      c = c + 1
+                      t[c] = schar(192 + mfloor(uv/64), 128 + uv%64)
+                    elseif uv < 65536 then
+                      c = c + 1
+                      t[c] = schar(224 + mfloor(uv/64/64), 128 + mfloor(uv/64)%64, 128 + uv%64)
+                    else
+                      c = c + 1
+                      t[c] = schar(240 + mfloor(uv/64/64/64), 128 + mfloor(uv/64/64)%64, 128 + mfloor(uv/64)%64, 128 + uv%64)
+                    end
+                  end
+                else
+                  if #uc > 6 or tonumber(uc, 16) > 1114111 then
+                    mkerr("UTF-8 value too large near '%s%s\\%s'", startChar, table.concat(t), ssub(s, nj, nj + 1 + math.min(#uc, 6)))
+                  end
+                  mkerr("missing '}' near '%s%s\\%s'", startChar, table.concat(t), ssub(s, nj, nj + 2 + #uc))
+                end
+              else
+                mkerr("hexadecimal digit expected near '%s%s\\%s'", startChar, table.concat(t), ssub(s, nj, nj + 2))
+              end
+            else
+              mkerr("missing '{' near '%s%s\\%s'", startChar, table.concat(t), ssub(s, nj, nj + 1))
+            end
+          elseif tonumber(v, 10) then
+            if tonumber(ssub(s, nj + 1, nj + 1)) then
+              if tonumber(ssub(s, nj + 2, nj + 2)) then
+                -- \000
+                local b = tonumber(ssub(s, nj, nj+2), 10)
+                if b > 255 then
+                  mkerr("decimal escape too large near '%s%s\\%s'", startChar, table.concat(t), ssub(s, nj, nj+3))
+                else
+                  c = c + 1
+                  t[c] = schar(b)
+                  nj = nj + 2
+                end
+              else
+                -- \00
+                c = c + 1
+                t[c] = schar(tonumber(ssub(s, nj, nj+1), 10))
+                nj = nj + 1
+              end
+            else
+              -- \0
+              c = c + 1
+              t[c] = schar(tonumber(v, 10))
+            end
           else
-            local n = tonumber(c, 16)
-            if n then
-              return string.char(n)
-            end
-            local o = d:find("[0-9a-fA-F]") and c or d
-            error(("[%s]:%d: hexadecimal digit expected near '\\x%s'"):format(s,getline(s,bpos+idx),o), 0)
+            mkerr("invalid escape sequence near '%s%s\\%s'", startChar, table.concat(t), v)
           end
-        end)
-      if x > 1 then
-        -- handle \z
-        nt[x] = string.gsub(nt[x], "^[%s]*", "")
-      end
-      bpos = bpos + #y
-    end
-    -- merge
-    return table.concat(nt, "")
-  end
-
--- Parse a string like it's a Lua 5.3 string.
-  local function parseString53(s)
-    -- "validate" string
-    local startChar = string.sub(s,1,1)
-    if startChar~=squote and startChar~=dquote then
-      error("not a string", 0)
-    end
-    if string.sub(s, -1, -1) ~= startChar then
-      error(("[%s]:%d: unfinished string"):format(s, getline(s, -1)), 0)
-    end
-
-    -- remove quotes
-    local str = string.sub(s, 2, -2)
-
-    -- replace "normal" escapes with a padded escape
-    str = string.gsub(str, "()\\(.)", function(idx,c)
-        return pads53[c] or
-        error(("[%s]:%d: invalid escape sequence near '\\%s'"):format(s, getline(s, idx), c), 0)
-      end)
-
-    -- check for non-escaped startChar
-    do
-      local idx = string.find(str, "[" .. startChar .. "\n]")
-      if idx then
-        error(("[%s]:%d: unfinished string"):format(s, getline(s, idx - 1)), 0)
-      end
-    end
-
-    -- pad numerical escapes
-    str = string.gsub(str, "\\([0-9])(.?)(.?)", function(a, b, c)
-        local x = a
-        -- swap b and c if #b == 0; this is to avoid UB:
-        -- _in theory_ `c` could match but not `b`, this solves
-        -- that problem. uncomment if you know what you're doing.
-        if #b == 0 then b, c = c, b end
-        if numbers[b] then
-          x, b = x .. b, ""
-          if numbers[c] then
-            x, c = x .. c, ""
+        elseif k == startChar then
+          if eos-1 > j then
+            mkerr("<eof> expected")
           end
+          nj = nil
+        elseif k == '\n' or k == '\r' then
+          mkerr("unfinished string near '%s'", startChar .. table.concat(t))
+          nj = nil
         end
-        return backslash .. ("0"):rep(3 - #x) .. x .. b .. c
-      end)
-
-    local t = {}
-    local i = 1
-    local last = 1
-    -- split on \z
-    -- we can look for "\z" directly because we already escaped everything else
-    for from, to in findpairs(str, "\\[uz]", false) do
-      t[i] = string.sub(str, last, from - 1)
-      last = from
-      i = i + 1
-    end
-    t[i] = string.sub(str, last)
-
-    -- parse results
-    local nt = {}
-    local bpos = 0 -- TODO fix newline handling
-    for x,y in ipairs(t) do
-      -- fix "\x" and "\xn"
-      if y:sub(-3):find("\\x", 1, true) then
-        -- append 2 startChars, this'll error anyway so it doesn't matter.
-        y = y .. startChar .. startChar
+      else
+        nj = nil
       end
-      nt[x] = string.gsub(y, "()\\(([x0-9])((.).))",
-        function(idx,a,b,c,d)
-          if b ~= "x" then
-            local n = tonumber(a)
-            if n >= 256 then
-              error(("[%s]:%d: decimal escape too large near '\\%s'"):format(s,getline(s,bpos+idx),a), 0)
-            end
-            return string.char(n)
-          else
-            local n = tonumber(c, 16)
-            if n then
-              return string.char(n)
-            end
-            local o = d:find("[0-9a-fA-F]") and c or d
-            error(("[%s]:%d: hexadecimal digit expected near '\\x%s'"):format(s,getline(s,bpos+idx),o), 0)
-          end
-        end)
-      if x > 1 then
-        -- handle \z
-        nt[x] = string.gsub(nt[x], "^\\z[%s]*", "")
-        if nt[x]:sub(1,2) == "\\u" then
-          if nt[x]:sub(3,3) ~= "{" then
-            error(("[%s]:%d: missing '{' near '\\u'"):format(s,getline(s,bpos+3)), 0)
-          end
-          local mt, l = nt[x]:match("^\\u{([0-9a-fA-F]+}?)()")
-          if not mt then
-            error(("[%s]:%d: hexadecimal digit expected near '\\u{'"):format(s,getline(s,bpos+4)), 0)
-          end
-          if mt:sub(-1,-1) ~= "}" then
-            error(("[%s]:%d: missing '}' near '\\u{%s'"):format(s,getline(s,bpos+l),mt), 0)
-          end
-          mt = mt:sub(1,-2) -- remove }
-          if #mt > 6 or tonumber(mt, 16) > 1114111 then
-            error(("[%s]:%d: UTF-8 value too large near '\\u{%s'"):format(s,getline(s,bpos+l),mt), 0)
-          end
-          local n = tonumber(mt, 16)
-          local unicoded
-          if n < 128 then
-            unicoded = string.char(n)
-          elseif n < 2048 then
-            local low = (n % 64) + 128
-            local high = math.floor(n / 64) + 192
-            unicoded = string.char(high, low)
-          elseif n < 0x10000 then
-            local low = (n % 64) + 128
-            local med = (math.floor(n/64) % 64) + 128
-            local high = math.floor(n/64/64) + 224
-            unicoded = string.char(high, med, low)
-          else
-            local low = (n % 64) + 128
-            local med = (math.floor(n/64) % 64) + 128
-            local high = (math.floor(n/64/64) % 64) + 128
-            local higher = math.floor(n/64/64/64) + 240
-            unicoded = string.char(higher, high, med, low)
-          end
-        end
-      end
-      bpos = bpos + #y
+    until not nj
+    if ssub(s, -1, -1) ~= startChar then
+      mkerr("unfinished string near <eof>")
     end
-    -- merge
-    return table.concat(nt, "")
+    return table.concat(t)
   end
 
 -- "tests"
 -- TODO add more
 -- also add automatic checks
-  if _VERSION == "Lua 5.2" and not ... then
-    -- test string parsing
-    local t = {
+  if not ... then
+    local mktests52 = function(...)
+      return
       [=["\""]=],
       [=["\32"]=],
       [=["\256"]=],
@@ -615,86 +596,135 @@ package.preload.stringliteral = function(...)
       [=['\\z
     ']=],
       [=['
-    ']=]
-    }
-    for _, str in ipairs(t) do
-      local s, m = pcall(parseString52, str)
-      io.write(tostring(s and ("[" .. m .. "]") or "nil"))
-      io.write(tostring(s and "" or ("\t" .. m)) .. "\n")
-      s, m = load("return " .. str, "=[" .. str .. "]")
-      io.write(tostring(s and ("[" .. s() .. "]")))
-      io.write(tostring(m and "\t"..m or "") .. "\n")
-      print()
-      -- TODO assert that printed status and printed error are
-      -- the same between parse52()/parseString52() vs load()
-    end
-    -- test line stuff
-    local t2 = {
-      {"test\nother", 5, 1},
-      {"test\nother", 6, 2},
-      {"\n", 1, 1},
-      {"\n", 2, 2}, -- there is no char 2 but that's not the point
-    }
-    for i, temp in ipairs(t2) do
-      local got, expect = getline(temp[1], temp[2]), temp[3]
-      assert(got == expect, ("got %d, expected %d (for %d)"):format(got, expect, i))
-    end
-  elseif _VERSION == "Lua 5.3" and not ... then
-    -- test string parsing
-    local t = {
-      [=["\""]=],
-      [=["\32"]=],
-      [=["\256"]=],
-      [=["\xnn"]=],
-      '"\\\n"',
-      [=["\x"]=],
-      [=["\xn"]=],
-      [=['\x']=],
-      [=['\x0']=],
-      [=['   \\z\ 
-    \x']=],
-      [=['\\z 
     ']=],
-      [=['
+      [=['\z
     ']=],
-      [=['\u{10FFFF}']=],
-      [=['\u{20}']=],
+      [=['\z
+    ]=],
+      [=['hello\i']=],
+      [=['"']=],
+      [=["'"]=],
       [=[' \z \z \z \
 \
 \x']=],
+      [=['\z\n']=],
+      '"\\z\n\r\n\r\r\n\n\n',
+      '"\\z \n\r \n\r \r\n \n \n',
+      '"\\\r"',
+      '"\\\n"',
+      '"\\\r\n"',
+      '"\\\n\r"',
+      ...
+    end
+
+    local mktests53 = function(...)
+      return
+      [=['\u']=],
+      [=['\u{']=],
+      [=['\u{}']=],
       [=['\u{1']=],
-    }
-    for _, str in ipairs(t) do
-      local s, m = xpcall(parseString53, function(m) if m:sub(1,1) ~= "[" then print(debug.traceback()) end return m end, str)
-      io.write(tostring(s and ("[" .. m .. "]") or "nil"))
-      io.write(tostring(s and "" or ("\t" .. m)) .. "\n")
-      s, m = load("return " .. str, "=[" .. str .. "]")
-      io.write(tostring(s and ("[" .. s() .. "]")))
-      io.write(tostring(m and "\t"..m or "") .. "\n")
-      print()
-      -- TODO assert that printed status and printed error are
-      -- the same between parse53()/parseString53() vs load()
+      [=['\u{99999999999999999999999999999999}']=],
+      [=['\u{99999999999999999999999999999999']=],
+      [=['\u{110000}']=],
+      [=['\u{110000']=],
+      [=['\u{20}']=],
+      [=['\u{10FFFF}']=],
+      [=['\u{24}']=],
+      [=['\u{A2}']=],
+      [=['\u{20AC}']=],
+      [=['\u{10438}']=],
+      [=['\u{DF00}']=],
+      ...
     end
-    -- test line stuff
-    local t2 = {
-      {"test\nother", 5, 1},
-      {"test\nother", 6, 2},
-      {"\n", 1, 1},
-      {"\n", 2, 2}, -- there is no char 2 but that's not the point
-    }
-    for _, temp in ipairs(t2) do
-      local got, expect = getline(temp[1], temp[2]), temp[3]
-      assert(got == expect, ("got %d, expected %d"):format(got, expect))
+
+
+    if _VERSION == "Lua 5.2" then
+      -- test string parsing
+      local t = {
+        mktests52()
+      }
+      for _, str in ipairs(t) do
+        local s, m = xpcall(function() return parse52(str) end, function(m) if m:sub(1,1) ~= "[" then print(debug.traceback()) end return m end)
+        io.write(tostring(s and ("[" .. m .. "]") or "nil"))
+        io.write(tostring(s and "" or ("\t" .. m)) .. "\n")
+        local s2, m2 = load("return " .. str, "=[" .. str .. "]")
+        io.write(tostring(s2 and ("[" .. s2() .. "]") or "nil"))
+        io.write(tostring(m2 and "\t"..m2 or "") .. "\n")
+        if s and s2 then
+          assert(m == s2())
+        elseif not (s or s2) then
+          assert(m == m2)
+        else
+          assert(false)
+        end
+        print()
+      end
+
+      if os.getenv("BENCHMARK") == "NewString.lua-5.2" then
+        local assert = assert
+        local s = '"\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\"\\"\\\\"'
+        local s2 = 'HELLO\44\32""\\'
+        for i = 1, 100000 do
+          assert(parse52(s) == s2)
+        end
+      elseif os.getenv("BENCHMARK") == "load-5.2" then
+        local load = load
+        local assert = assert
+        local s = 'return "\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\"\\"\\\\"'
+        local s2 = 'HELLO\44\32""\\'
+        for i = 1, 100000 do
+          assert(load(s)() == s2)
+        end
+      end
+    elseif _VERSION == "Lua 5.3" then
+      -- test string parsing
+      local t = {
+        mktests52(mktests53())
+      }
+      for _, str in ipairs(t) do
+        local s, m = xpcall(parse53, function(m) if m:sub(1,1) ~= "[" then print(debug.traceback()) end return m end, str)
+        io.write(tostring(s and ("[" .. m .. "]") or "nil"))
+        io.write(tostring(s and "" or ("\t" .. m)) .. "\n")
+        local s2, m2 = load("return " .. str, "=[" .. str .. "]")
+        io.write(tostring(s2 and ("[" .. s2() .. "]")))
+        io.write(tostring(m2 and "\t"..m2 or "") .. "\n")
+        if s and s2 then
+          assert(m == s2())
+        elseif not (s or s2) then
+          assert(m == m2)
+        else
+          assert(false)
+        end
+        print()
+      end
+
+      if os.getenv("BENCHMARK") == "NewString.lua-5.3" then
+        local assert = assert
+        local s = '"\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\u{20}\\"\\"\\\\"'
+        local s2 = 'HELLO\44\32\32""\\'
+        for i = 1, 100000 do
+          assert(parse53(s) == s2)
+        end
+      elseif os.getenv("BENCHMARK") == "load-5.3" then
+        local load = load
+        local assert = assert
+        local s = 'return "\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\u{20}\\"\\"\\\\"'
+        local s2 = 'HELLO\44\32\32""\\'
+        for i = 1, 100000 do
+          assert(load(s)() == s2)
+        end
+      end
+    else
+      print("Test requirements:")
+      print("Test Target | Notes")
+      print("parse52     | _VERSION == 'Lua 5.2'")
+      print("parse53     | _VERSION == 'Lua 5.3'")
     end
-  elseif not ... then
-    print("Tests require Lua 5.2")
   end
 
   return {
-    parse52 = parseString52,
-    parse53 = parseString53,
-    findpairs = findpairs,
-    getline = getline,
+    parse52 = parse52,
+    parse53 = parse53,
   }
 end
 
