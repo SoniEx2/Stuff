@@ -25,7 +25,7 @@
 
 --]]
 local hexchat = hexchat
-hexchat.register("CTCP-S CW", "2.1.1", "CTCP-S CW for HexChat.")
+hexchat.register("CTCP-S CW", "2.1.2", "CTCP-S CW for HexChat.")
 
 package.preload.rc4 = function(...)
 --[[
