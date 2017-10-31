@@ -73,7 +73,7 @@ local function parse52(s)
             mkerr("hexadecimal digit expected near '\\" .. v:match('x[0-9a-f]*.') .. "'")
           end
         elseif v == "z" then
-          local eaten, np = s:match("^([\t\n\v\f\r ]*)%f[^\t\n\v\f\r ]()", nj+1)
+          local eaten, np = s:match("^([\t\n\v\f\r ]*)()", nj+1)
           local p=np
           nj = p-1
           local skip = false
@@ -180,7 +180,7 @@ local function parse53(s)
             mkerr("hexadecimal digit expected near '%s%s\\%s'", startChar, table.concat(t), v:match('x[0-9a-f]*.'))
           end
         elseif v == "z" then
-          local eaten, np = s:match("^([\t\n\v\f\r ]*)%f[^\t\n\v\f\r ]()", nj+1)
+          local eaten, np = s:match("^([\t\n\v\f\r ]*)()", nj+1)
           local p=np
           nj = p-1
           local skip = false
@@ -308,6 +308,7 @@ if not ... then
     [=[' \z \z \z \
 \
 \x']=],
+    [=['\z\n']=],
     '"\\z\n\r\n\r\r\n\n\n',
     '"\\z \n\r \n\r \r\n \n \n',
     '"\\\r"',
