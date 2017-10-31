@@ -5,20 +5,27 @@ local tonumber = tonumber
 local sfind = string.find
 local ssub = string.sub
 local schar = string.char
+local sbyte = string.byte
 local mfloor = math.floor
 
-local simpleEscapes = {
-  a = '\a',
-  b = '\b',
-  f = '\f',
-  r = '\r',
-  n = '\n',
-  t = '\t',
-  v = '\v',
-  ['"'] = '"',
-  ["'"] = "'",
-  ['\\'] = '\\',
-}
+local simpleEscapes = {}
+for i = 1, 255 do
+  simpleEscapes[i] = false
+end
+for k,v in pairs({
+    a = '\a',
+    b = '\b',
+    f = '\f',
+    r = '\r',
+    n = '\n',
+    t = '\t',
+    v = '\v',
+    ['"'] = '"',
+    ["'"] = "'",
+    ['\\'] = '\\',
+    }) do
+  simpleEscapes[sbyte(k)] = v
+end
 
 local function parse52(s)
   local startChar = ssub(s,1,1)
@@ -44,9 +51,10 @@ local function parse52(s)
       if k == "\\" then
         nj = j + 1
         local v = ssub(s, nj, nj)
-        if simpleEscapes[v] then
+        local simple = simpleEscapes[sbyte(v)]
+        if simple then
           c = c + 1
-          t[c] = simpleEscapes[v]
+          t[c] = simple
         elseif v == "\r" or v == "\n" then
           ln = ln + 1
           local v1 = ssub(s, nj + 1, nj + 1)
@@ -150,9 +158,10 @@ local function parse53(s)
       if k == "\\" then
         nj = j + 1
         local v = ssub(s, nj, nj)
-        if simpleEscapes[v] then
+        local simple = simpleEscapes[sbyte(v)]
+        if simple then
           c = c + 1
-          t[c] = simpleEscapes[v]
+          t[c] = simple
         elseif v == "\r" or v == "\n" then
           ln = ln + 1
           local v1 = ssub(s, nj + 1, nj + 1)
@@ -324,6 +333,7 @@ if not ... then
     [=['\u{A2}']=],
     [=['\u{20AC}']=],
     [=['\u{10438}']=],
+    [=['\u{DF00}']=],
     ...
   end
 
@@ -352,16 +362,16 @@ if not ... then
 
     if os.getenv("BENCHMARK") == "NewString.lua-5.2" then
       local assert = assert
-      local s = '"\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20"'
-      local s2 = "HELLO\44\32"
+      local s = '"\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\"\\"\\\\"'
+      local s2 = 'HELLO\44\32""\\'
       for i = 1, 100000 do
         assert(parse52(s) == s2)
       end
     elseif os.getenv("BENCHMARK") == "load-5.2" then
       local load = load
       local assert = assert
-      local s = 'return "\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20"'
-      local s2 = "HELLO\44\32"
+      local s = 'return "\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\"\\"\\\\"'
+      local s2 = 'HELLO\44\32""\\'
       for i = 1, 100000 do
         assert(load(s)() == s2)
       end
@@ -390,16 +400,16 @@ if not ... then
 
     if os.getenv("BENCHMARK") == "NewString.lua-5.3" then
       local assert = assert
-      local s = '"\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\u{20}"'
-      local s2 = "HELLO\44\32\32"
+      local s = '"\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\u{20}\\"\\"\\\\"'
+      local s2 = 'HELLO\44\32\32""\\'
       for i = 1, 100000 do
         assert(parse53(s) == s2)
       end
     elseif os.getenv("BENCHMARK") == "load-5.3" then
       local load = load
       local assert = assert
-      local s = 'return "\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\u{20}"'
-      local s2 = "HELLO\44\32\32"
+      local s = 'return "\\z \n\r \n\r \r\n \n \nHELLO\\44\\x20\\u{20}\\"\\"\\\\"'
+      local s2 = 'HELLO\44\32\32""\\'
       for i = 1, 100000 do
         assert(load(s)() == s2)
       end
